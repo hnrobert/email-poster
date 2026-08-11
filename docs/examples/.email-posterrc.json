@@ -1,0 +1,7 @@
+{
+  "postUrl": "https://prod-00.westus.logic.azure.com:443/workflows/xxx/triggers/manual/paths/invoke",
+  "preset": "custom_example",
+  "headers": { "Authorization": "Bearer replace-me" },
+  "timeoutMs": 15000,
+  "retry": { "codes": [429, 500, 502, 503, 504], "maxAttempts": 3 }
+}

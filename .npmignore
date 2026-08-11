@@ -1,0 +1,19 @@
+# Development sources & tooling — not published.
+# (package.json "files" already whitelists dist/skill/README/LICENSE/CHANGELOG;
+# this is a belt-and-suspenders exclude list if "files" is ever removed.)
+src/
+cli/
+adapters/
+tests/
+docs/
+.github/
+.editorconfig
+.npmignore
+.gitignore
+.gitattributes
+node_modules/
+*.test.ts
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+pnpm-workspace.yaml
