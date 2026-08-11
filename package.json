@@ -1,6 +1,6 @@
 {
   "name": "email-poster",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Schema-driven email sending over HTTP POST webhooks (Power Automate / smtogo / Resend-like / custom JSON gateways).",
   "keywords": [
     "email",
