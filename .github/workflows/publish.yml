@@ -1,24 +1,30 @@
 name: Publish
 
-# Publish to the npm registry when a version tag (`v*`) is pushed, or manually.
+# Publish to npm two ways:
+#   1. Tag push:  git tag v0.2.0 && git push origin v0.2.0
+#   2. Manual:    Actions tab → "Run workflow" → enter a version (e.g. 0.2.0).
+#                 The workflow bumps package.json, commits, tags, pushes, then publishes.
 #
-# Usage:
-#   git tag v0.1.0
-#   git push origin v0.1.0
-#
-# Requires the repo secret `NPM_TOKEN` (an npm access/automation token with
-# publish rights for `email-poster`). `id-token: write` enables npm provenance,
-# which attests the build to its source — recommended for public packages.
+# Requires the repo secret NPM_TOKEN (an npm access/automation token with publish rights).
+#   - id-token: write  → npm provenance (attests the build to its source).
+#   - contents: write  → lets the manual path push the release commit + tag.
+# A tag pushed by this workflow's own GITHUB_TOKEN does NOT re-trigger this workflow
+# (GitHub suppresses GITHUB_TOKEN-generated events), so there's no double publish.
 
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, e.g. 0.2.0 (leading "v" is optional). Bumps package.json, commits, tags, then publishes.'
+        required: true
+        type: string
 
 permissions:
-  contents: read
-  id-token: write   # required for `npm publish --provenance`
+  contents: write
+  id-token: write
 
 concurrency:
   group: npm-publish
@@ -31,8 +37,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Reads the pnpm version from package.json `packageManager` (pnpm@11.13.0);
-      # passing `version` here conflicts and throws ERR_PNPM_BAD_PM_VERSION.
+      # version comes from package.json `packageManager` (pnpm@11.21.0) —
+      # don't pass `version` here, it conflicts and throws ERR_PNPM_BAD_PM_VERSION.
       - name: Install pnpm
         uses: pnpm/action-setup@v6
 
@@ -52,7 +58,32 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # Manual path only: set the requested version, then commit + tag + push.
+      # Runs after tests pass so we never tag a broken tree. Skipped on tag-push
+      # runs, where package.json already carries the version.
+      - name: Bump, commit, tag, push
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          VERSION="${INPUT_VERSION#v}"                      # tolerate "v0.2.0"
+          if [ -z "$VERSION" ]; then
+            echo "::error::version input is required (e.g. 0.2.0)"
+            exit 1
+          fi
+          npm version "$VERSION" --no-git-tag-version        # validates semver, edits package.json
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          git add package.json
+          git commit -m "chore(release): v$VERSION"
+          git tag "v$VERSION"
+          git push origin "HEAD:$BRANCH" "v$VERSION"
+
       # `prepublishOnly` runs `pnpm build && chmod +x dist/cli.js` automatically,
       # so the tarball (dist + .agents + README/LICENSE/CHANGELOG) is fresh.
       - name: Publish
         run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
