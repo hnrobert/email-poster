@@ -47,7 +47,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "email-poster": "./dist/cli.js"
+    "email-poster": "dist/cli.js"
   },
   "files": [
     "dist",
