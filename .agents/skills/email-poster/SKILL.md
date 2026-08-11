@@ -13,25 +13,19 @@ opt-in SSRF guard, hooks, and HTML template rendering.
 
 ## Install this skill
 
-This skill ships inside the `email-poster` npm package under `skills/email-poster/`
-(the [`skills-npm`](https://github.com/antfu/skills-npm) convention), so agent tooling
-can discover and link it automatically.
+This skill ships at `.agents/skills/email-poster/` — a directory convention the open
+[`npx skills`](https://github.com/vercel-labs/skills) CLI (skills.sh) recognizes and scans.
 
 ```bash
-# 1. install the package in your project
-pnpm add email-poster   # or: npm i email-poster
+# From the GitHub repo (npx skills pulls from git, not node_modules):
+npx skills add hnrobert/email-poster
+# → finds .agents/skills/email-poster/SKILL.md and installs into your project or local agent
 
-# 2. one-time setup — wires the `prepare` hook and links the skill into whatever
-#    coding agents it auto-detects (Claude Code, Cursor, …)
-npx skills-npm setup
-
-# thereafter every `pnpm install` / `npm install` re-links skills automatically
+# Or from the npm package already in your project (local path):
+npx skills add ./node_modules/email-poster/.agents/skills/email-poster
 ```
 
-No `skills-npm`? Copy it manually:
-```bash
-cp -R node_modules/email-poster/skills/email-poster ~/.claude/skills/   # Claude Code
-```
+Manual copy: `cp -R node_modules/email-poster/.agents/skills/email-poster ~/.claude/skills/`
 
 ## When to use this skill
 

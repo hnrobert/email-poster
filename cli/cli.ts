@@ -6,6 +6,7 @@
 import { pathToFileURL } from 'node:url'
 import { runSend, type SendFlags } from './send'
 import { runValidate } from './validate-cmd'
+import { runInstallSkill } from './install-skill'
 
 const VERSION = '0.1.0'
 
@@ -64,8 +65,9 @@ USAGE
   email-poster <command> [options]
 
 COMMANDS
-  send        Validate + assemble + POST an email (or --dry-run to preview)
-  validate    Zod-check a config file (exit 0 = valid, 1 = invalid)
+  send           Validate + assemble + POST an email (or --dry-run to preview)
+  validate       Zod-check a config file (exit 0 = valid, 1 = invalid)
+  install-skill  Copy the bundled AI-agent skill into your agent's skill directory
 
 send OPTIONS
   --to <addr>            recipient (repeatable)
@@ -91,6 +93,10 @@ send OPTIONS
 validate OPTIONS
   --config <path>        config file to validate (required)
   --json                 emit JSON
+
+install-skill OPTIONS
+  [agent]                claude | codex | gemini | cursor | opencode | all
+                         (omit to auto-detect installed agents; fallback: claude)
 
 CONFIG PRECEDENCE (send)
   .email-posterrc.json  <  EMAIL_POSTER_* env  <  --config <file>  <  CLI flags
@@ -149,6 +155,10 @@ export async function main(argv: string[]): Promise<number> {
       return 1
     }
     return runValidate({ config, json: p.bools.has('--json') })
+  }
+
+  if (command === 'install-skill') {
+    return runInstallSkill(p.positional[1] ?? one(p, '--to'))
   }
 
   console.error(`error: unknown command "${command ?? ''}". Run "email-poster --help".`)

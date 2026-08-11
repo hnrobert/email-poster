@@ -45,7 +45,7 @@ console.log(res.messageId, res.status)
 ## Presets
 
 | Preset | Output JSON (for `to:'a@b.c', subject:'Hi', body:'<b>X</b>'`) | Use when |
-|---|---|---|
+| --- | --- | --- |
 | `smtogo` *(default)* | `{ from, to, subject, html }` | smtogo gateway / Resend-html shape |
 | `generic` | `{ from, to, subject, html \| text }` | resend-like dual-body (html/text split by `type`) |
 | `custom_example` | `{ email, subject, content }` | Power Automate shape (renamed from `powerautomate`) |
@@ -101,18 +101,22 @@ new EmailPoster({
 ## Reliability
 
 - **Timeout** per attempt (`timeoutMs`), composable with an external `AbortSignal`:
+
   ```ts
   await mail.send(input, { signal: ctrl.signal, timeoutMs: 5_000 })
   ```
+
 - **Retry** with full-jitter exponential backoff on configurable status codes + network errors.
   External abort → `ABORTED` (never retried); internal timeout → `TIMEOUT` (retried).
 - **Errors** are `EmailPosterError { code, status?, detail?, requestId? }`:
+
   ```ts
   enum ErrorCode {
     CONFIG_INVALID, VALIDATION_FAILED, REQUEST_FAILED, TIMEOUT,
     ABORTED, RETRY_EXHAUSTED, URL_BLOCKED, PARSE_FAILED,
   }
   ```
+
   Guard with `isEmailPosterError(e)`.
 
 ## SSRF guard (opt-in, off by default)
@@ -146,6 +150,7 @@ import { configure, send, getDefaultPoster } from 'email-poster'
 configure({ postUrl: process.env.MAIL_WEBHOOK_URL!, preset: 'smtogo' }) // wins over env
 await send({ to: 'a@b.c', subject: 'Hi', body: 'b' })                    // uses default poster
 ```
+
 Without `configure()`, the default poster is built lazily from `EMAIL_POSTER_*` env vars.
 
 ## Hooks
@@ -160,6 +165,7 @@ new EmailPoster({
   },
 })
 ```
+
 `beforeSend` may return a rewritten `{ payload, headers }` (applied once before the first
 attempt). `afterSend`/`onError` are fire-and-forget; hook errors are warned, never thrown.
 
@@ -173,6 +179,7 @@ const html = renderEmailCard(
 )
 await mail.send({ to: 'a@b.c', subject: 'Welcome', body: html })
 ```
+
 Light by default, dark via `prefers-color-scheme`. Bring your own template string if needed.
 
 ## CLI
@@ -185,7 +192,10 @@ echo "Hello" | npx email-poster send --preset smtogo --url https://x.com \
   --to a@b.c --subject Hi --body-stdin
 
 npx email-poster validate --config .email-posterrc.json
+
+npx email-poster install-skill all   # install the bundled Agent Skill for every agent
 ```
+
 Run `npx email-poster --help` for the full flag list.
 Config precedence: `.email-posterrc.json` < `EMAIL_POSTER_*` env < `--config <file>` < flags.
 
@@ -204,21 +214,29 @@ import { createMailRoute } from 'email-poster/adapters/hono'
 app.post('/mail', createMailRoute(poster))
 ```
 
-See the [`skills/email-poster/`](./skills/email-poster) directory for a Claude Code skill
-with a preset decision tree, full reference, and copy-paste framework wiring.
+See the [`.agents/skills/email-poster/`](./.agents/skills/email-poster) directory for an
+[Agent Skill](https://agentskills.io) with a preset decision tree, full reference, and
+copy-paste framework wiring.
 
 ### Install the skill for your AI agent
 
-The skill ships inside the package under `skills/email-poster/` (the
-[`skills-npm`](https://github.com/antfu/skills-npm) convention), so agents can discover it.
-After installing the package, sync it into your agent(s):
+The skill ships at `.agents/skills/email-poster/` — a directory convention the open
+[`npx skills`](https://github.com/vercel-labs/skills) CLI (skills.sh) recognizes and scans.
+Install it three ways, pick whichever fits your setup:
 
 ```bash
-npx skills-npm setup     # one-time: wires the `prepare` hook + first sync
-# thereafter every `pnpm install` / `npm install` re-links skills automatically
-```
+# 1. From the GitHub repo (recommended — `npx skills` pulls from git, not node_modules):
+npx skills add hnrobert/email-poster
+#    → finds .agents/skills/email-poster/SKILL.md and installs it into your project
+#      (`.agents/skills/`) or your local agent, detected automatically
 
-Or copy it manually: `cp -R node_modules/email-poster/skills/email-poster ~/.claude/skills/`
+# 2. From the npm package you already installed (local path):
+npx skills add ./node_modules/email-poster/.agents/skills/email-poster
+
+# 3. Bundled installer — copies straight into each agent's native dir (no extra tooling):
+npx email-poster install-skill            # auto-detect (fallback: claude)
+npx email-poster install-skill all        # claude + codex + gemini + cursor + opencode
+```
 
 ## License
 

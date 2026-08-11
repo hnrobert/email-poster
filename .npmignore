@@ -1,5 +1,5 @@
 # Development sources & tooling — not published.
-# (package.json "files" already whitelists dist/skill/README/LICENSE/CHANGELOG;
+# (package.json "files" already whitelists dist/.agents/README/LICENSE/CHANGELOG;
 # this is a belt-and-suspenders exclude list if "files" is ever removed.)
 src/
 cli/
