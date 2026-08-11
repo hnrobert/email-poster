@@ -85,5 +85,4 @@ jobs:
       # so the tarball (dist + .agents + README/LICENSE/CHANGELOG) is fresh.
       - name: Publish
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        
