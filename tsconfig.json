@@ -3,7 +3,11 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022"],
+    "paths": {
+      "email-poster/pure": ["./src/pure.ts"],
+      "email-poster": ["./src/index.ts"]
+    },
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "declaration": true,
     "strict": true,

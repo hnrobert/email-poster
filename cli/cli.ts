@@ -9,7 +9,7 @@ import { runValidate } from './validate-cmd'
 import { runInstallSkill } from './install-skill'
 import { runExportInterface, runDetectInterface } from './interface-cmd'
 
-const VERSION = '0.2.0'
+const VERSION = '0.3.0'
 
 const BOOL_FLAGS = new Set(['--dry-run', '--json', '--json-schema', '--body-stdin', '--help', '-h', '--version', '-V'])
 

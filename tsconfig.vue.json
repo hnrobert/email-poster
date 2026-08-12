@@ -1,0 +1,22 @@
+{
+  "//": "Type-check the browser-safe Vue entry (vue/**). Used by `pnpm typecheck`. Paths point at SOURCE so typecheck works on a fresh clone (no build needed). noEmit:true so no rootDir/emit concerns.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "noEmit": true,
+    "paths": {
+      "email-poster/pure": ["./src/pure.ts"],
+      "email-poster": ["./src/index.ts"]
+    }
+  },
+  "include": ["vue/**/*.ts", "vue/**/*.vue"]
+}

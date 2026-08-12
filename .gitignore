@@ -90,6 +90,9 @@ out
 # Nuxt.js build / generate output
 .nuxt
 dist
+# Generated Vue entry type declarations (produced by `pnpm build:vue`, shipped via files[])
+vue/*.d.ts
+.vue-dts/
 
 # Gatsby files
 .cache/

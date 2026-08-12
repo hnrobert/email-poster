@@ -1,0 +1,16 @@
+{
+  "//": "Emit .d.ts for the Vue entry beside its source (vue/*.d.ts). Used by `pnpm build:vue` (runs after `tsup`, so dist/*.d.ts exist). Paths point at the BUILT declarations so the referenced types are not re-emitted and not rootDir-checked.",
+  "extends": "./tsconfig.vue.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": ".vue-dts",
+    "rootDir": "vue",
+    "paths": {
+      "email-poster/pure": ["./dist/pure.d.ts"],
+      "email-poster": ["./dist/index.d.ts"]
+    }
+  },
+  "include": ["vue/**/*.ts", "vue/**/*.vue"]
+}
