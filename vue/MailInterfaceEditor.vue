@@ -47,9 +47,18 @@ const {
   onImportFile,
 } = c
 
-// Push the working copy outward whenever it mutates. The composable's own
-// JSON-compare watch prevents feedback loops on external resyncs.
-watch(fields, (next) => emit('update:modelValue', { ...next }), { deep: true })
+// Push the working copy outward on genuine user edits. Skip the emit when the
+// working copy already equals the parent's value — that happens right after an
+// external resync (e.g. the parent calling "discard"). Echoing a value the
+// parent already holds is a redundant no-op that re-dirties serializers whose
+// getter/setter aren't perfectly idempotent (e.g. a v-model computed over a JSON
+// string that falls back to a preset default when empty), which makes actions
+// like discard require two clicks to "take". Mirrors the symmetric guard in the
+// composable's resync watch.
+watch(fields, (next) => {
+  if (JSON.stringify(next) === JSON.stringify(props.modelValue)) return
+  emit('update:modelValue', { ...next })
+}, { deep: true })
 
 function onDetect(): void {
   const r = c.runDetect()

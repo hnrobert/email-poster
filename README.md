@@ -182,6 +182,81 @@ await mail.send({ to: 'a@b.c', subject: 'Welcome', body: html })
 
 Light by default, dark via `prefers-color-scheme`. Bring your own template string if needed.
 
+## Visual field-map editor (Vue, optional subpath)
+
+`email-poster/vue` ships a dependency-free, fully restyle-able **visual editor** for the
+`fields` map — the JSON you'd otherwise hand-write. Drop it into an admin UI so operators can
+pick a preset, map each logical field to a downstream key, watch a live payload preview, and
+detect a map from a pasted sample request. Built on the browser-safe `email-poster/pure` subset
+(no `node:` builtins, no transport) — safe for the client bundle. Requires **Vue ≥ 3.4**.
+
+> **One bit of config required.** The editor ships as `.vue` source (your Vite/Nuxt compiles
+> it), and esbuild can't pre-bundle `.vue` — so exclude the package from dep optimization:
+>
+> ```ts
+> // nuxt.config.ts / vite.config.ts
+> vite: { optimizeDeps: { exclude: ['email-poster'] } }
+> ```
+
+### Ready-to-use component
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import { MailInterfaceEditor, type FieldMap } from 'email-poster/vue'
+
+// v-model is the FieldMap your server validates / persists as the mail config.
+const fieldMap = ref<FieldMap>({ to: 'to', subject: 'subject', body: 'html' })
+const saving = ref(false)
+</script>
+
+<template>
+  <MailInterfaceEditor
+    v-model="fieldMap"
+    :disabled="saving"
+    @detected="(e) => toast.success(e.message)"
+    @imported="(e) => toast.success(e.message)"
+    @error="(e) => toast.error(e.message)"
+  />
+</template>
+```
+
+Events (wire to **your own** toast — the editor ships no UI framework): `detected`, `imported`,
+`success` each carry `{ message, count?, fields? }`; `error` carries `{ message }`.
+
+### Styling — works with or without Tailwind / shadcn
+
+Plain HTML + `.ep-*` classes, themed by `--ep-*` CSS variables. Defaults live under
+`:where(.ep-editor)` (zero specificity), so any override wins. Four ways to restyle:
+
+1. **Remap `--ep-*` to your tokens** — also gives you dark mode for free (example below).
+2. Target `.ep-*` classes directly (scoped styles may need higher specificity).
+3. Replace whole sections via named slots: `#header`, `#presets`, `#fields`, `#field` (per row),
+   `#group-label`, `#preview`, `#detect`, `#actions`.
+4. Pass a root `class` through to `.ep-editor`.
+
+For a shadcn / Tailwind theme, point the variables at your tokens:
+
+```css
+.ep-editor {
+  --ep-color-primary: var(--primary);
+  --ep-color-primary-fg: var(--primary-foreground);
+  --ep-color-border: var(--border);
+  --ep-color-fg: var(--foreground);
+  --ep-color-muted-fg: var(--muted-foreground);
+  --ep-color-muted-bg: var(--muted);
+  --ep-color-destructive: var(--destructive);
+  --ep-radius: var(--radius);
+}
+```
+
+### Headless — build your own UI
+
+All logic, zero markup — `useMailInterfaceEditor(modelValue)` returns `{ fields, setField,
+applyPreset, activePreset, payloadPreview, runDetect, exportDef, exportSchema, onImportFile, … }`.
+Full return shape, the SFC's props/emits/slots, and the complete `--ep-*` variable list are in the
+[Agent Skill reference](./.agents/skills/email-poster/reference.md).
+
 ## CLI
 
 ```bash

@@ -215,12 +215,24 @@ export function useMailInterfaceEditor(
         fields: fields.value,
         fromAddress: 'sender@example.com',
       })
+      // Sample carries an example value for EVERY mappable logical field, so
+      // mapping any of them (cc / bcc / replyTo / tagName / headers /
+      // attachments) is immediately reflected in the preview. buildPayload only
+      // emits a field when both the map key and the input value exist, so fields
+      // the user hasn't mapped simply stay absent. (`from` is covered by the
+      // config's fromAddress below.)
       const payload = buildPayload(
         {
           to: 'recipient@example.com',
+          cc: 'cc@example.com',
+          bcc: 'bcc@example.com',
+          replyTo: 'reply@example.com',
           subject: 'Welcome',
           body: '<p>Hello</p>',
           type: previewType.value,
+          tagName: 'welcome',
+          headers: { 'X-Demo': 'true' },
+          attachments: [{ filename: 'invite.pdf', content: '<base64>' }],
         },
         cfg,
       )

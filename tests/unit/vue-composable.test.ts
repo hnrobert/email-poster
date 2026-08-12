@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useMailInterfaceEditor } from '../../vue/useMailInterfaceEditor'
 import { PRESETS, exportInterface, type FieldMap } from 'email-poster/pure'
 
@@ -72,6 +72,73 @@ describe('useMailInterfaceEditor', () => {
   it('payloadPreview is an error comment when no body key is mapped', () => {
     const c = useMailInterfaceEditor({ to: 'to', subject: 'subject' })
     expect(c.payloadPreview.value.startsWith('//')).toBe(true)
+  })
+
+  it('payloadPreview reflects cc/bcc/replyTo/tagName/headers once mapped (regression)', () => {
+    // The preview's sample input must carry a value for every mappable field so
+    // that mapping a previously-absent field (cc, replyTo, …) shows up live.
+    const c = useMailInterfaceEditor({
+      to: 'to',
+      subject: 'subject',
+      body: 'content',
+      cc: 'cc_key',
+      bcc: 'bcc_key',
+      replyTo: 'reply_key',
+      tagName: 'tag',
+      headers: 'hdrs',
+    })
+    const payload = JSON.parse(c.payloadPreview.value) as Record<string, unknown>
+    expect(payload.cc_key).toBe('cc@example.com')
+    expect(payload.bcc_key).toBe('bcc@example.com')
+    expect(payload.reply_key).toBe('reply@example.com')
+    expect(payload.tag).toBe('welcome')
+    expect(payload.hdrs).toEqual({ 'X-Demo': 'true' })
+  })
+
+  it('does not echo an external resync as update:modelValue (discard reaches clean in one step)', async () => {
+    // Reproduce the gateway's v-model computed: getter parses a JSON string,
+    // falling back to PRESETS.smtogo when empty; setter stringifies. The
+    // round-trip is non-idempotent, so a child that re-emits on resync makes
+    // discard leave the string dirty (the "two-click discard" bug).
+    const postFieldMap = ref('')
+    const fieldMap = computed<FieldMap>({
+      get: () => {
+        const raw = postFieldMap.value.trim()
+        if (raw) {
+          try {
+            return JSON.parse(raw) as FieldMap
+          } catch {
+            /* fall through */
+          }
+        }
+        return PRESETS.smtogo
+      },
+      set: (fm: FieldMap) => {
+        postFieldMap.value = JSON.stringify(fm)
+      },
+    })
+    const c = useMailInterfaceEditor(() => fieldMap.value)
+    // Mirror the SFC's outward watch WITH the skip-when-equal guard.
+    watch(
+      c.fields,
+      (next) => {
+        if (JSON.stringify(next) === JSON.stringify(fieldMap.value)) return
+        fieldMap.value = { ...next }
+      },
+      { deep: true },
+    )
+
+    c.setField('cc', 'cc') // user edit propagates outward
+    await nextTick()
+    expect(postFieldMap.value).not.toBe('')
+
+    postFieldMap.value = '' // discard
+    await nextTick()
+
+    // With the guard, the editor resyncs without echoing, so the serialized
+    // form stays clean — no second discard needed.
+    expect(postFieldMap.value).toBe('')
+    expect(c.fields.value).toEqual({ ...PRESETS.smtogo })
   })
 
   it('runDetect infers a field map from a sample instance and applies it', () => {

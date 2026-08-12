@@ -32,6 +32,7 @@ Manual copy: `cp -R node_modules/email-poster/.agents/skills/email-poster ~/.cla
 - The user is POSTing JSON to Power Automate / a smtogo gateway / any webhook to send mail.
 - Multiple services copy-paste the same `sendViaPost` `fetch(...)` block — consolidate it.
 - The downstream wants non-standard keys (`email` instead of `to`, `content` instead of `body`, …).
+- The user wants a visual UI for editing the field map (presets, live payload preview, detect-from-sample, import/export) — `email-poster/vue`.
 
 **Don't use it for:** direct SMTP (nodemailer), or a single managed vendor SDK (Resend/SendGrid/Courier) where you'd rather use their first-party client.
 
@@ -89,6 +90,16 @@ With split keys, sending `type:'html'` when only `bodyText` is mapped throws `VA
 - Timeout 15s per attempt; external `AbortSignal` via `send(input, { signal })`.
 - Retry: exponential backoff (full-jitter) on `{408,425,429,500,502,503,504}`, 3 attempts, 0.5s→8s.
 - Errors are `EmailPosterError { code, status?, detail?, requestId? }` — see `reference.md` for the `ErrorCode` enum.
+
+## 6. Visual field-map editor (`email-poster/vue`)
+
+A restyle-able Vue editor for the `fields` map — drop into admin UIs so operators map fields
+visually instead of editing JSON: preset buttons, 13 grouped field rows with live body-XOR, a
+live downstream-payload preview, detect-from-sample, and import/export (InterfaceDef JSON or
+JSON Schema). Ships a ready `<MailInterfaceEditor>` SFC and a headless `useMailInterfaceEditor()`
+composable. Browser-safe (depends only on `vue` + `email-poster/pure`). Requires Vue ≥ 3.4 and
+`vite.optimizeDeps.exclude: ['email-poster']` (the SFC ships as `.vue` source). See `reference.md`
+for the full props / emits / slots / composable / `--ep-*` CSS-variable API.
 
 ## Common pitfalls
 
