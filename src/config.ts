@@ -37,6 +37,12 @@ export type FieldMap = z.infer<typeof FieldMapSchema>
 
 /** Built-in payload presets. `custom_example` is the legacy Power Automate shape. */
 export const PRESETS = {
+  /**
+   * No preset base — `fields` is the complete, authoritative map. Used by
+   * `exportInterface`/`importInterface` for provably-lossless round-trips:
+   * with an empty base, no preset key can ever leak into a re-imported map.
+   */
+  none: {},
   /** SMTGo-style gateway: { from, to, subject, html }. */
   smtogo: { from: 'from', to: 'to', subject: 'subject', bodyHtml: 'html' },
   /** Resend-like relay: { from, to, subject, html, text }. */
@@ -76,7 +82,7 @@ export const EmailPosterConfigSchema = z.object({
   /** Downstream webhook URL. */
   postUrl: z.string().url(),
   /** Select a built-in field-map preset. Overridden/extended by `fields`. */
-  preset: z.enum(['smtogo', 'generic', 'custom_example']).optional(),
+  preset: z.enum(['none', 'smtogo', 'generic', 'custom_example']).optional(),
   /** Override or extend the chosen preset's field map. */
   fields: FieldMapSchema.optional(),
   /** Default From address; `input.from` overrides per message. */

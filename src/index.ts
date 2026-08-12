@@ -24,6 +24,19 @@ export {
   type PresetName,
 } from './config'
 export {
+  INTERFACE_DEF_VERSION,
+  INTERFACE_DEF_SCHEMA_URL,
+  InterfaceDefSchema,
+  exportInterface,
+  importInterface,
+  detectInterface,
+  exportPayloadSchema,
+  type InterfaceDef,
+  type InterfaceDefInput,
+  type ImportedInterface,
+  type DetectOptions,
+} from './interface'
+export {
   SendMailInputSchema,
   AttachmentSchema,
   EMAIL_RE,

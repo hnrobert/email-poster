@@ -7,10 +7,11 @@ import { pathToFileURL } from 'node:url'
 import { runSend, type SendFlags } from './send'
 import { runValidate } from './validate-cmd'
 import { runInstallSkill } from './install-skill'
+import { runExportInterface, runDetectInterface } from './interface-cmd'
 
-const VERSION = '0.1.0'
+const VERSION = '0.2.0'
 
-const BOOL_FLAGS = new Set(['--dry-run', '--json', '--body-stdin', '--help', '-h', '--version', '-V'])
+const BOOL_FLAGS = new Set(['--dry-run', '--json', '--json-schema', '--body-stdin', '--help', '-h', '--version', '-V'])
 
 interface Parsed {
   flags: Map<string, string[]>
@@ -65,9 +66,11 @@ USAGE
   email-poster <command> [options]
 
 COMMANDS
-  send           Validate + assemble + POST an email (or --dry-run to preview)
-  validate       Zod-check a config file (exit 0 = valid, 1 = invalid)
-  install-skill  Copy the bundled AI-agent skill into your agent's skill directory
+  send               Validate + assemble + POST an email (or --dry-run to preview)
+  validate           Zod-check a config file (exit 0 = valid, 1 = invalid)
+  export-interface   Print the interface (field map) of a config as JSON
+  detect-interface   Infer an interface from a sample downstream JSON
+  install-skill      Copy the bundled AI-agent skill into your agent's skill directory
 
 send OPTIONS
   --to <addr>            recipient (repeatable)
@@ -93,6 +96,15 @@ send OPTIONS
 validate OPTIONS
   --config <path>        config file to validate (required)
   --json                 emit JSON
+
+export-interface OPTIONS
+  --config <path>        config file to export the interface from (required)
+  --json-schema          emit a standard JSON Schema (draft-07) of the downstream
+                         payload instead of an email-poster InterfaceDef
+
+detect-interface OPTIONS
+  --input <path>         sample downstream JSON (instance or JSON Schema) to
+                         infer a field map from (required)
 
 install-skill OPTIONS
   [agent]                claude | codex | gemini | cursor | opencode | all
@@ -159,6 +171,24 @@ export async function main(argv: string[]): Promise<number> {
 
   if (command === 'install-skill') {
     return runInstallSkill(p.positional[1] ?? one(p, '--to'))
+  }
+
+  if (command === 'export-interface') {
+    const config = one(p, '--config')
+    if (!config) {
+      console.error('error: export-interface requires --config <path>')
+      return 1
+    }
+    return runExportInterface({ config, jsonSchema: p.bools.has('--json-schema') })
+  }
+
+  if (command === 'detect-interface') {
+    const input = one(p, '--input')
+    if (!input) {
+      console.error('error: detect-interface requires --input <sample.json>')
+      return 1
+    }
+    return runDetectInterface({ input })
   }
 
   console.error(`error: unknown command "${command ?? ''}". Run "email-poster --help".`)

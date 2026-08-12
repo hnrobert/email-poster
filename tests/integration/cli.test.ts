@@ -160,4 +160,51 @@ describe('cli main()', () => {
       await rm(dir, { recursive: true })
     }
   })
+
+  it('export-interface prints the InterfaceDef; --json-schema switches format', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ep-'))
+    const cfgPath = join(dir, 'mail.json')
+    await writeFile(cfgPath, JSON.stringify({ postUrl: 'https://x.com', preset: 'smtogo' }))
+    try {
+      const code = await main(['export-interface', '--config', cfgPath])
+      expect(code).toBe(0)
+      const def = JSON.parse(logSpy.mock.calls[0]![0] as string)
+      expect(def.preset).toBe('none')
+      expect(def.fields).toEqual({ from: 'from', to: 'to', subject: 'subject', bodyHtml: 'html' })
+
+      const code2 = await main(['export-interface', '--config', cfgPath, '--json-schema'])
+      expect(code2).toBe(0)
+      const schema = JSON.parse(logSpy.mock.calls[1]![0] as string)
+      expect(schema.$schema).toBe('http://json-schema.org/draft-07/schema#')
+      expect(schema.properties.html).toEqual({ type: 'string' })
+    } finally {
+      await rm(dir, { recursive: true })
+    }
+  })
+
+  it('export-interface requires --config', async () => {
+    const code = await main(['export-interface'])
+    expect(code).toBe(1)
+    expect(errSpy.mock.calls.flat().join('\n')).toContain('--config')
+  })
+
+  it('detect-interface infers a map from a sample instance', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ep-'))
+    const samplePath = join(dir, 'sample.json')
+    await writeFile(samplePath, JSON.stringify({ email: 'c@d', subject: 'S', content: 'x' }))
+    try {
+      const code = await main(['detect-interface', '--input', samplePath])
+      expect(code).toBe(0)
+      const def = JSON.parse(logSpy.mock.calls[0]![0] as string)
+      expect(def.fields).toEqual({ to: 'email', subject: 'subject', body: 'content' })
+    } finally {
+      await rm(dir, { recursive: true })
+    }
+  })
+
+  it('detect-interface requires --input', async () => {
+    const code = await main(['detect-interface'])
+    expect(code).toBe(1)
+    expect(errSpy.mock.calls.flat().join('\n')).toContain('--input')
+  })
 })
