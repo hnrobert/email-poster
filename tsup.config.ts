@@ -5,6 +5,10 @@ export default defineConfig([
     // Library: consumed by importers, ship dual ESM + CJS + types.
     entry: {
       index: 'src/index.ts',
+      // Browser-safe, node-free subset (interface I/O, payload building, presets).
+      // Importing `EmailPoster`/transport from the root pulls node:net/crypto/fs;
+      // this entry excludes them so it bundles for the client without polyfills.
+      pure: 'src/pure.ts',
       template: 'src/template/index.ts',
       'adapters/nuxt': 'adapters/nuxt.ts',
       'adapters/nestjs': 'adapters/nestjs.ts',

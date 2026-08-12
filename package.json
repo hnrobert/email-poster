@@ -32,6 +32,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./pure": {
+      "types": "./dist/pure.d.ts",
+      "import": "./dist/pure.js",
+      "require": "./dist/pure.cjs"
+    },
     "./template": {
       "types": "./dist/template.d.ts",
       "import": "./dist/template.js",
