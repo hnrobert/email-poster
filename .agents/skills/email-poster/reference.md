@@ -107,7 +107,7 @@ A restyle-able editor for a `FieldMap` — a ready SFC plus a headless composabl
 | --- | --- | --- | --- |
 | `modelValue` | `FieldMap` | — | **v-model** — the active field map (the selected schema's fields). |
 | `disabled` | `boolean` | `false` | Disables every control. |
-| `manageSchemas` | `boolean` | `true` | Render the client-side schema manager (switch/add/rename/delete/modify). `false` = legacy fixed-preset buttons. |
+| `manageSchemas` | `boolean` | `true` | Render the schema manager (switch/add/rename/delete/modify). `false` = legacy fixed-preset buttons. |
 | `defaultSchemas` | `PostSchema[]` | `DEFAULT_SCHEMAS` | Seed used when the store's storage is empty. Pass `[]` to start blank. |
 | `storageKey` | `string` | `'ep-mail-schemas'` | `localStorage` key for the internal schema store. |
 | `schemaStore` | `UseSchemaStoreResult` | *(internal)* | Inject your own `useSchemaStore()` — share across components or swap storage. |
@@ -158,10 +158,12 @@ overrides the download sink, e.g. for tests). `DetectOutcome` / `ImportOutcome` 
 `{ ok: true; count; fields } | { ok: false; error }`. Also exported: `GROUPS`, `PRESET_BUTTONS`,
 and types `FieldDef`, `MailInterfaceEditorOptions`, `MailInterfaceEditorResult`.
 
-### `useSchemaStore(options?)` — client-side schema library
+### `useSchemaStore(options?)` — post-schemas library
 
 A managed collection of named field maps with CRUD + persistence. The engine behind the SFC's
-schema manager; usable headless. `PostSchema = { id, name, fields: FieldMap }`.
+schema manager; usable headless. `PostSchema = { id, name, fields: FieldMap }`. These are **post
+schemas** (the webhook *payload structure*), not email body templates — the HTML/text rendering
+lives in `email-poster/template`.
 
 | Option | Default | Notes |
 | --- | --- | --- |

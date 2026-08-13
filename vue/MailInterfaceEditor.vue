@@ -521,14 +521,14 @@ async function onImport(e: Event): Promise<void> {
 .ep-schema__select {
   display: flex;
   align-items: center;
-  gap: var(--ep-space-row);
+  gap: var(--ep-gap-btn);
   flex: 1 1 auto;
   min-width: 0;
   font: inherit;
   color: var(--ep-color-fg);
   background: transparent;
   border: 0;
-  padding: 0.25rem 0;
+  padding: 0.25rem 0 0.25rem 0.5rem;
   cursor: pointer;
   text-align: left;
 }
