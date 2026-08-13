@@ -16,12 +16,12 @@ Field map: `{ from: 'from', to: 'to', subject: 'subject', bodyHtml: 'html', body
 ```
 With `type: 'text'` it instead emits `{ ..., "text": "<body>" }` (no `html` key). Resend-like dual-body gateways.
 
-## `custom_example` (Power Automate shape)
+## `custom_example` (Custom Example trigger shape)
 Field map: `{ to: 'email', subject: 'subject', body: 'content' }`
 ```json
 { "email": "a@b.c", "subject": "Hi", "content": "<b>X</b>" }
 ```
-> Renamed from `powerautomate`. Single `body` key, so both `text` and `html` go into `content`; no `from` by default.
+> Single `body` key, so both `text` and `html` go into `content`; no `from` by default.
 
 ## Custom (no preset)
 ```ts

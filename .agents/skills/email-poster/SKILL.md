@@ -1,6 +1,6 @@
 ---
 name: email-poster
-description: Send transactional email by POSTing a small JSON payload to an HTTP webhook (Microsoft Power Automate flow, a custom "smtogo" gateway, or any JSON-accepting endpoint). Use when the user wants to send mail over an HTTP POST webhook, consolidate duplicated sendViaPost logic across services, or map logical email fields (to/subject/body/type) onto a downstream's custom JSON keys. Not for SMTP-only sending (use nodemailer) or single-vendor SaaS SDKs (Resend/SendGrid).
+description: Send transactional email by POSTing a small JSON payload to an HTTP webhook (a SMToGo-style gateway, a custom JSON trigger, or any JSON-accepting endpoint). Use when the user wants to send mail over an HTTP POST webhook, consolidate duplicated sendViaPost logic across services, or map logical email fields (to/subject/body/type) onto a downstream's custom JSON keys. Not for SMTP-only sending (use nodemailer) or single-vendor SaaS SDKs (Resend/SendGrid).
 ---
 
 # email-poster
@@ -29,7 +29,7 @@ Manual copy: `cp -R node_modules/email-poster/.agents/skills/email-poster ~/.cla
 
 ## When to use this skill
 
-- The user is POSTing JSON to Power Automate / a smtogo gateway / any webhook to send mail.
+- The user is POSTing JSON to a SMToGo-style gateway / a custom JSON trigger / any webhook to send mail.
 - Multiple services copy-paste the same `sendViaPost` `fetch(...)` block — consolidate it.
 - The downstream wants non-standard keys (`email` instead of `to`, `content` instead of `body`, …).
 - The user wants a visual UI for editing the field map (presets, live payload preview, detect-from-sample, import/export) — `email-poster/vue`.
@@ -42,7 +42,7 @@ Manual copy: `cp -R node_modules/email-poster/.agents/skills/email-poster ~/.cla
 |---|---|---|
 | `{ from, to, subject, html }` | `smtogo` | the smtogo / Resend-html shape |
 | `{ from, to, subject, html, text }` (html+text split) | `generic` | resend-like dual-body |
-| `{ email, subject, content }` | `custom_example` | the Power Automate shape (renamed from `powerautomate`) |
+| `{ email, subject, content }` | `custom_example` | the Custom Example trigger shape |
 | Anything else | omit `preset`, declare `fields` | fully custom |
 
 If none fit, declare a custom field map — see `presets.md` for the exact JSON each preset emits.
@@ -94,12 +94,17 @@ With split keys, sending `type:'html'` when only `bodyText` is mapped throws `VA
 ## 6. Visual field-map editor (`email-poster/vue`)
 
 A restyle-able Vue editor for the `fields` map — drop into admin UIs so operators map fields
-visually instead of editing JSON: preset buttons, 13 grouped field rows with live body-XOR, a
+visually instead of editing JSON: a **client-side template library** (switch / add / rename /
+delete; editing the active template updates it), 13 grouped field rows with live body-XOR, a
 live downstream-payload preview, detect-from-sample, and import/export (InterfaceDef JSON or
-JSON Schema). Ships a ready `<MailInterfaceEditor>` SFC and a headless `useMailInterfaceEditor()`
-composable. Browser-safe (depends only on `vue` + `email-poster/pure`). Requires Vue ≥ 3.4 and
-`vite.optimizeDeps.exclude: ['email-poster']` (the SFC ships as `.vue` source). See `reference.md`
-for the full props / emits / slots / composable / `--ep-*` CSS-variable API.
+JSON Schema). Ships a ready `<MailInterfaceEditor>` SFC and headless composables
+(`useMailInterfaceEditor()`, `useTemplateStore()` + `DEFAULT_TEMPLATES`,
+`useTemplateEditorBinding()`). Templates persist to `localStorage` by default and seed, on first
+use, from the built-in presets (SMToGo / Resend-like / Custom Example / Blank); importing the
+seed is opt-in (`defaults: DEFAULT_TEMPLATES`). Browser-safe (depends only on `vue` +
+`email-poster/pure`). Requires Vue ≥ 3.4 and `vite.optimizeDeps.exclude: ['email-poster']` (the
+SFC ships as `.vue` source). See `reference.md` for the full props / emits / slots / composable /
+`--ep-*` CSS-variable API.
 
 ## Common pitfalls
 

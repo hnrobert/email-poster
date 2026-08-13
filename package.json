@@ -1,13 +1,12 @@
 {
   "name": "email-poster",
   "version": "0.3.2",
-  "description": "Schema-driven email sending over HTTP POST webhooks (Power Automate / smtogo / Resend-like / custom JSON gateways).",
+  "description": "Schema-driven email sending over HTTP POST webhooks (SMToGo / Resend-like / custom JSON gateways).",
   "keywords": [
     "email",
     "mail",
     "post",
     "webhook",
-    "power-automate",
     "transactional",
     "resend",
     "nodemailer-alternative"

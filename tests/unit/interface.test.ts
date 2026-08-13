@@ -137,7 +137,7 @@ describe('detectInterface', () => {
     })
   })
 
-  it('detects the custom_example / Power Automate shape', () => {
+  it('detects the custom_example trigger shape', () => {
     const def = detectInterface({ email: 'c@d', subject: 'S', content: 'x' })
     expect(def.fields).toEqual({ to: 'email', subject: 'subject', body: 'content' })
   })

@@ -17,5 +17,18 @@ export {
   type MailInterfaceEditorOptions,
   type MailInterfaceEditorResult,
 } from './useMailInterfaceEditor'
+export {
+  DEFAULT_TEMPLATES,
+  useTemplateStore,
+  type MailTemplate,
+  type TemplateStorage,
+  type UseTemplateStoreOptions,
+  type UseTemplateStoreResult,
+} from './useTemplateStore'
+export {
+  useTemplateEditorBinding,
+  type UseTemplateEditorBindingOptions,
+  type UseTemplateEditorBindingResult,
+} from './useTemplateEditorBinding'
 // Re-export the types consumers need to annotate their v-model.
 export type { FieldMap, PresetName } from 'email-poster/pure'

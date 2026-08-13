@@ -1,6 +1,6 @@
 # email-poster
 
-> Schema-driven transactional email over HTTP POST webhooks — Power Automate, smtogo, or any JSON gateway.
+> Schema-driven transactional email over HTTP POST webhooks — SMToGo, custom JSON, or any webhook gateway.
 
 [![CI](https://github.com/hnrobert/email-poster/actions/workflows/ci.yml/badge.svg)](https://github.com/hnrobert/email-poster/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/email-poster.svg)](https://www.npmjs.com/package/email-poster)
@@ -48,7 +48,7 @@ console.log(res.messageId, res.status)
 | --- | --- | --- |
 | `smtogo` *(default)* | `{ from, to, subject, html }` | smtogo gateway / Resend-html shape |
 | `generic` | `{ from, to, subject, html \| text }` | resend-like dual-body (html/text split by `type`) |
-| `custom_example` | `{ email, subject, content }` | Power Automate shape (renamed from `powerautomate`) |
+| `custom_example` | `{ email, subject, content }` | Custom Example trigger shape |
 
 ## Custom field mapping
 
@@ -186,9 +186,13 @@ Light by default, dark via `prefers-color-scheme`. Bring your own template strin
 
 `email-poster/vue` ships a dependency-free, fully restyle-able **visual editor** for the
 `fields` map — the JSON you'd otherwise hand-write. Drop it into an admin UI so operators can
-pick a preset, map each logical field to a downstream key, watch a live payload preview, and
-detect a map from a pasted sample request. Built on the browser-safe `email-poster/pure` subset
-(no `node:` builtins, no transport) — safe for the client bundle. Requires **Vue ≥ 3.4**.
+pick a preset, map each logical field to a downstream key, watch a live payload preview, detect a
+map from a pasted sample request, or **import one from a JSON Schema** (an email-poster
+InterfaceDef, a standard draft-07 schema, or a webhook trigger schema — including Power
+Automate-style ones). It also manages a **template library** (switch / add / rename /
+delete; editing the active template updates it) so common field maps are one click away. Built on
+the browser-safe `email-poster/pure` subset (no `node:` builtins, no transport) — safe for the
+client bundle. Requires **Vue ≥ 3.4**.
 
 > **One bit of config required.** The editor ships as `.vue` source (your Vite/Nuxt compiles
 > it), and esbuild can't pre-bundle `.vue` — so exclude the package from dep optimization:
@@ -222,7 +226,59 @@ const saving = ref(false)
 ```
 
 Events (wire to **your own** toast — the editor ships no UI framework): `detected`, `imported`,
-`success` each carry `{ message, count?, fields? }`; `error` carries `{ message }`.
+`success` each carry `{ message, count?, fields? }`; `error` carries `{ message }`;
+`template-active` carries `{ id, name }`; `templates-change` carries `{ templates }`.
+
+### Multi-template library
+
+By default the editor shows a **template manager** above the field rows — a list of named field
+maps the operator can switch between, add to, rename, and delete. Editing the fields of the active
+template writes back to it automatically (so a template stays in sync with what you last edited).
+
+**The consuming application owns template storage** — not the browser. Persistence goes through a
+`storage` adapter the consumer provides, and the package ships a localStorage adapter as a
+ready-made default. For a server app the intended pattern is a **custom adapter that loads/saves
+against your own backend** (database / API), so templates are shared across operators and survive
+a browser switch rather than living in one browser's `localStorage`. The library seeds, the first
+time only, from the package's built-ins (`SMToGo` / `Resend-like` / `Custom Example` / `Blank`) —
+the same shapes as the presets — unless the consumer opts out.
+
+```vue
+<MailInterfaceEditor v-model="fieldMap" :disabled="saving" />
+<!-- template manager on by default; v-model still reflects the active field map -->
+```
+
+| Prop | Default | Purpose |
+| --- | --- | --- |
+| `manageTemplates` | `true` | Render the template manager. Set `false` for the legacy fixed-preset buttons. |
+| `defaultTemplates` | `DEFAULT_TEMPLATES` | Seed used when storage is empty. Pass `[]` to start blank, or your own list. |
+| `storageKey` | `'ep-mail-templates'` | `localStorage` key for the built-in adapter. |
+| `templateStore` | *(internal)* | Inject your own `useTemplateStore()` — to share one store across components or swap the storage adapter (e.g. a server-backed one). |
+
+The store is the consumer's storage for templates; `v-model` is the active field map your server
+persists. They're decoupled by design: the library is a palette of field maps, and the selected
+one's fields flow out through `v-model`. To persist templates somewhere other than `localStorage`
+— your own backend, an in-memory spy for tests, or not at all — build the store yourself and pass
+it in:
+
+```ts
+import { MailInterfaceEditor, useTemplateStore, DEFAULT_TEMPLATES } from 'email-poster/vue'
+
+// Back the library with your own backend: load() returns the saved list (or
+// undefined the first time, so it seeds DEFAULT_TEMPLATES), save() persists.
+const store = useTemplateStore({
+  defaults: DEFAULT_TEMPLATES,
+  storage: {
+    load: () => props.templates,                 // fetched from your API
+    save: (t) => debouncePut('/api/templates', t), // persisted to your DB
+  },
+})
+// in-memory only (e.g. tests): storage: false
+```
+
+> **SSR (Nuxt):** the editor touches the DOM (file inputs, focus), so wrap it in `<ClientOnly>`.
+> When you back the store with your own backend, guard the adapter's load/save with
+> `import.meta.client` so no backend I/O fires during server-side render.
 
 ### Styling — works with or without Tailwind / shadcn
 
@@ -231,8 +287,8 @@ Plain HTML + `.ep-*` classes, themed by `--ep-*` CSS variables. Defaults live un
 
 1. **Remap `--ep-*` to your tokens** — also gives you dark mode for free (example below).
 2. Target `.ep-*` classes directly (scoped styles may need higher specificity).
-3. Replace whole sections via named slots: `#header`, `#presets`, `#fields`, `#field` (per row),
-   `#group-label`, `#preview`, `#detect`, `#actions`.
+3. Replace whole sections via named slots: `#header`, `#presets`, `#templates`, `#fields`,
+   `#field` (per row), `#group-label`, `#preview`, `#detect`, `#actions`.
 4. Pass a root `class` through to `.ep-editor`.
 
 For a shadcn / Tailwind theme, point the variables at your tokens:
@@ -252,9 +308,20 @@ For a shadcn / Tailwind theme, point the variables at your tokens:
 
 ### Headless — build your own UI
 
-All logic, zero markup — `useMailInterfaceEditor(modelValue)` returns `{ fields, setField,
-applyPreset, activePreset, payloadPreview, runDetect, exportDef, exportSchema, onImportFile, … }`.
-Full return shape, the SFC's props/emits/slots, and the complete `--ep-*` variable list are in the
+All logic, zero markup:
+
+- `useMailInterfaceEditor(modelValue)` — the field-map editor: returns `{ fields, setField,
+  applyPreset, activePreset, payloadPreview, runDetect, exportDef, exportSchema, onImportFile, … }`.
+- `useTemplateStore({ defaults?, storage?, storageKey? })` — the template library (CRUD +
+  persistence). The consumer owns storage via the `storage` adapter (localStorage by default; pass
+  your own to back it with a backend). Returns `{ templates, activeId, addTemplate, renameTemplate,
+  deleteTemplate, updateTemplateFields, duplicateTemplate, resetToDefaults, … }`. Importing the
+  built-in seed is opt-in: pass `defaults: DEFAULT_TEMPLATES` to use it, or omit to start empty.
+- `useTemplateEditorBinding(modelValue, onUpdateModelValue, options?)` — wires the editor to a
+  template store (the logic the SFC's template manager uses), so a fully custom UI gets
+  switch/add/rename/delete/modify for free.
+
+Full return shapes, the SFC's props/emits/slots, and the complete `--ep-*` variable list are in the
 [Agent Skill reference](./.agents/skills/email-poster/reference.md).
 
 ## CLI

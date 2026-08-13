@@ -80,11 +80,11 @@ export const GROUPS: { title: string; fields: FieldDef[] }[] = [
   },
 ]
 
-/** Preset quick-load buttons (SMTGo / Resend-like / Power Automate / Blank). */
+/** Preset quick-load buttons (SMToGo / Resend-like / Custom Example / Blank). */
 export const PRESET_BUTTONS: { key: PresetName; label: string; desc: string }[] = [
-  { key: 'smtogo', label: 'SMTGo', desc: '{ from, to, subject, html }' },
+  { key: 'smtogo', label: 'SMToGo', desc: '{ from, to, subject, html }' },
   { key: 'generic', label: 'Resend-like', desc: '{ from, to, subject, html, text }' },
-  { key: 'custom_example', label: 'Power Automate', desc: '{ email, subject, content }' },
+  { key: 'custom_example', label: 'Custom Example', desc: '{ email, subject, content }' },
   { key: 'none', label: 'Blank', desc: 'empty — map every key yourself' },
 ]
 

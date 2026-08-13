@@ -3,9 +3,29 @@
  * Visual editor for an email-poster FieldMap (logical field → downstream JSON
  * key). Dependency-free, restyle-able SFC. `v-model` is the FieldMap object.
  *
- * Built on the headless `useMailInterfaceEditor` composable; this file is only
- * the render layer. Notifications are emitted as events (`detected` /
- * `imported` / `error` / `success`) so consumers wire their own toast.
+ * This file is only the render layer. All state/logic lives in two composables:
+ *  - `useTemplateEditorBinding` — wires the field-map editor to a template
+ *    library (switch / add / rename / delete; edits modify the active template;
+ *    highlight derived from `modelValue`). See that module for the exact
+ *    semantics, which are unit-tested.
+ *  - `useMailInterfaceEditor` — the field-map editor itself (field rows, body
+ *    XOR, live preview, detect, import/export).
+ *
+ * Notifications are emitted as events (`detected` / `imported` / `error` /
+ * `success`) so consumers wire their own toast.
+ *
+ * ## Multi-template manager
+ * When `manageTemplates` is on (default), a template library replaces the fixed
+ * preset buttons. The consuming application owns template storage: persistence
+ * goes through a `storage` adapter, and the built-in default is a localStorage
+ * adapter keyed by `storageKey`. For a server app, pass your own `templateStore`
+ * whose adapter loads/saves against your backend (so templates are shared and
+ * durable, not per-browser). The library seeds from `defaultTemplates` (defaults
+ * to the package's `DEFAULT_TEMPLATES`) the first time only — pass
+ * `:default-templates="[]"` to start empty, or your own list. `v-model` keeps
+ * its parent-driven semantics: it always reflects the active field map and is
+ * never clobbered on mount. Set `manageTemplates` to `false` for the legacy
+ * fixed-preset behavior.
  *
  * Styling: plain HTML + `.ep-*` classes + `--ep-*` CSS custom properties. See
  * the two `<style>` blocks below. Override via CSS vars on `.ep-editor`, by
@@ -14,21 +34,64 @@
  * @license Apache-2.0
  */
 import { watch } from 'vue'
-import { useMailInterfaceEditor } from './useMailInterfaceEditor'
+import { useTemplateEditorBinding } from './useTemplateEditorBinding'
+import { DEFAULT_TEMPLATES, type MailTemplate, type UseTemplateStoreResult } from './useTemplateStore'
 import type { FieldMap } from 'email-poster/pure'
 
-const props = withDefaults(defineProps<{ modelValue: FieldMap; disabled?: boolean }>(), {
-  disabled: false,
-})
+const props = withDefaults(
+  defineProps<{
+    modelValue: FieldMap
+    disabled?: boolean
+    /** Render the template manager (switch/add/rename/delete/modify). Default `true`. */
+    manageTemplates?: boolean
+    /** Seed templates used when the store's storage is empty. Default `DEFAULT_TEMPLATES`. */
+    defaultTemplates?: MailTemplate[]
+    /** localStorage key for the built-in adapter. Default `'ep-mail-templates'`. */
+    storageKey?: string
+    /** Inject your own store (e.g. one whose adapter backs it with your backend). */
+    templateStore?: UseTemplateStoreResult
+  }>(),
+  {
+    disabled: false,
+    manageTemplates: true,
+    defaultTemplates: () => DEFAULT_TEMPLATES,
+    storageKey: 'ep-mail-templates',
+  },
+)
 const emit = defineEmits<{
   'update:modelValue': [FieldMap]
   detected: [{ message: string; count: number; fields: FieldMap }]
   imported: [{ message: string; count: number; fields: FieldMap }]
   error: [{ message: string }]
   success: [{ message: string; count?: number }]
+  /** The active field map no longer matches any saved template (or now matches one). */
+  'template-active': [{ id: string | null; name: string | null }]
+  /** The template library changed (add/rename/delete/modify). */
+  'templates-change': [{ templates: MailTemplate[] }]
 }>()
 
-const c = useMailInterfaceEditor(() => props.modelValue, { disabled: () => props.disabled })
+const b = useTemplateEditorBinding(
+  () => props.modelValue,
+  (fm) => emit('update:modelValue', fm),
+  {
+    defaultTemplates: props.defaultTemplates,
+    storageKey: props.storageKey,
+    templateStore: props.templateStore,
+    disabled: () => props.disabled,
+  },
+)
+const {
+  editor: c,
+  templates,
+  activeTemplateId,
+  editingId,
+  draftName,
+  selectTemplate,
+  addTemplate,
+  startRename,
+  commitRename,
+  removeTemplate,
+} = b
 const {
   fields,
   sampleText,
@@ -47,18 +110,16 @@ const {
   onImportFile,
 } = c
 
-// Push the working copy outward on genuine user edits. Skip the emit when the
-// working copy already equals the parent's value — that happens right after an
-// external resync (e.g. the parent calling "discard"). Echoing a value the
-// parent already holds is a redundant no-op that re-dirties serializers whose
-// getter/setter aren't perfectly idempotent (e.g. a v-model computed over a JSON
-// string that falls back to a preset default when empty), which makes actions
-// like discard require two clicks to "take". Mirrors the symmetric guard in the
-// composable's resync watch.
-watch(fields, (next) => {
-  if (JSON.stringify(next) === JSON.stringify(props.modelValue)) return
-  emit('update:modelValue', { ...next })
-}, { deep: true })
+// Surface template-library changes as events for consumers that sync elsewhere.
+watch(activeTemplateId, (id) => {
+  const t = templates.value.find((x) => x.id === id)
+  emit('template-active', { id, name: t?.name ?? null })
+})
+watch(
+  templates,
+  (next) => emit('templates-change', { templates: next }),
+  { deep: true },
+)
 
 function onDetect(): void {
   const r = c.runDetect()
@@ -84,7 +145,7 @@ async function onImport(e: Event): Promise<void> {
 
 <template>
   <div class="ep-editor">
-    <!-- Header + presets -->
+    <!-- Header + presets (legacy single-map mode) -->
     <slot
       name="header"
       :active-preset="activePreset"
@@ -96,6 +157,7 @@ async function onImport(e: Event): Promise<void> {
         <div class="ep-header__main">
           <h3 class="ep-title">Payload interface</h3>
           <slot
+            v-if="!manageTemplates"
             name="presets"
             :active-preset="activePreset"
             :apply-preset="applyPreset"
@@ -121,11 +183,96 @@ async function onImport(e: Event): Promise<void> {
         </div>
         <slot name="help">
           <p class="ep-help">
-            Map each logical field to the downstream JSON key your webhook expects. A button loads a
-            preset; <code>body</code> and <code>bodyHtml</code>/<code>bodyText</code> are mutually
-            exclusive.
+            Map each logical field to the downstream JSON key your webhook expects. Pick a template to
+            load a preset, or map every key yourself; <code>body</code> and
+            <code>bodyHtml</code>/<code>bodyText</code> are mutually exclusive.
           </p>
         </slot>
+      </section>
+    </slot>
+
+    <!-- Template manager (switch / add / rename / delete; edits modify the active one) -->
+    <slot
+      v-if="manageTemplates"
+      name="templates"
+      :templates="templates"
+      :active-id="activeTemplateId"
+      :editing-id="editingId"
+      :draft-name="draftName"
+      :select="selectTemplate"
+      :add="addTemplate"
+      :start-rename="startRename"
+      :commit-rename="commitRename"
+      :remove="removeTemplate"
+      :disabled="isDisabled"
+    >
+      <section class="ep-templates">
+        <div class="ep-templates__head">
+          <h4 class="ep-group__title">Templates</h4>
+          <button
+            type="button"
+            class="ep-btn ep-btn--sm ep-btn--outline"
+            :disabled="isDisabled"
+            @click="addTemplate"
+          >
+            + New
+          </button>
+        </div>
+        <ul v-if="templates.length" class="ep-templates__list">
+          <li
+            v-for="t in templates"
+            :key="t.id"
+            class="ep-template"
+            :class="{ 'ep-template--active': activeTemplateId === t.id }"
+          >
+            <button
+              v-if="editingId !== t.id"
+              type="button"
+              class="ep-template__select"
+              :aria-pressed="activeTemplateId === t.id ? 'true' : 'false'"
+              :disabled="isDisabled"
+              :title="`Load “${t.name}”`"
+              @click="selectTemplate(t.id)"
+            >
+              <span class="ep-template__dot" aria-hidden="true"></span>
+              <span class="ep-template__name">{{ t.name }}</span>
+            </button>
+            <input
+              v-else
+              v-model="draftName"
+              class="ep-template__rename"
+              type="text"
+              :disabled="isDisabled"
+              @keyup.enter="commitRename(t.id)"
+              @blur="commitRename(t.id)"
+            />
+            <span v-if="editingId !== t.id" class="ep-template__actions">
+              <button
+                type="button"
+                class="ep-btn ep-btn--sm ep-btn--ghost"
+                :disabled="isDisabled"
+                title="Rename"
+                aria-label="Rename"
+                @click="startRename(t.id, t.name)"
+              >
+                ✎
+              </button>
+              <button
+                type="button"
+                class="ep-btn ep-btn--sm ep-btn--ghost"
+                :disabled="isDisabled"
+                title="Delete"
+                aria-label="Delete"
+                @click="removeTemplate(t.id)"
+              >
+                ✕
+              </button>
+            </span>
+          </li>
+        </ul>
+        <p v-else class="ep-help">
+          No templates yet — click “+ New” to save the current field map as a template.
+        </p>
       </section>
     </slot>
 
@@ -338,6 +485,90 @@ async function onImport(e: Event): Promise<void> {
   font-family: var(--ep-font-mono);
 }
 
+/* Template manager */
+.ep-templates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-group);
+}
+.ep-templates__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ep-gap-field);
+}
+.ep-templates__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ep-space-row);
+}
+.ep-template {
+  display: flex;
+  align-items: center;
+  gap: var(--ep-gap-field);
+  padding: 0.25rem 0.375rem;
+  border: 1px solid var(--ep-color-border);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-color-bg);
+}
+.ep-template--active {
+  border-color: var(--ep-color-primary-border);
+  background: var(--ep-color-muted-bg);
+}
+.ep-template__select {
+  display: flex;
+  align-items: center;
+  gap: var(--ep-space-row);
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  color: var(--ep-color-fg);
+  background: transparent;
+  border: 0;
+  padding: 0.25rem 0;
+  cursor: pointer;
+  text-align: left;
+}
+.ep-template__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--ep-color-border);
+  background: transparent;
+}
+.ep-template--active .ep-template__dot {
+  background: var(--ep-color-primary);
+  border-color: var(--ep-color-primary-border);
+}
+.ep-template__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ep-template__rename {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  color: var(--ep-color-fg);
+  background: var(--ep-color-bg);
+  border: 1px solid var(--ep-color-border);
+  border-radius: var(--ep-radius-sm);
+  padding: 0.25rem 0.5rem;
+}
+.ep-template__rename:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ep-color-ring);
+}
+.ep-template__actions {
+  display: flex;
+  gap: var(--ep-gap-btn);
+  flex: none;
+}
+
 /* Buttons (reset Tailwind preflight on <button>) */
 .ep-btn {
   font: inherit;
@@ -352,6 +583,11 @@ async function onImport(e: Event): Promise<void> {
 .ep-btn--sm {
   padding: 0.25rem 0.625rem;
   font-size: var(--ep-font-size-sm);
+}
+.ep-btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  padding: 0.25rem 0.5rem;
 }
 .ep-btn--outline {
   background: var(--ep-color-bg);

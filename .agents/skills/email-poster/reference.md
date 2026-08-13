@@ -105,21 +105,28 @@ A restyle-able editor for a `FieldMap` — a ready SFC plus a headless composabl
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `modelValue` | `FieldMap` | — | **v-model** — the field map. |
+| `modelValue` | `FieldMap` | — | **v-model** — the active field map (the selected template's fields). |
 | `disabled` | `boolean` | `false` | Disables every control. |
+| `manageTemplates` | `boolean` | `true` | Render the client-side template manager (switch/add/rename/delete/modify). `false` = legacy fixed-preset buttons. |
+| `defaultTemplates` | `MailTemplate[]` | `DEFAULT_TEMPLATES` | Seed used when the store's storage is empty. Pass `[]` to start blank. |
+| `storageKey` | `string` | `'ep-mail-templates'` | `localStorage` key for the internal template store. |
+| `templateStore` | `UseTemplateStoreResult` | *(internal)* | Inject your own `useTemplateStore()` — share across components or swap storage. |
 
 | Emit | Payload | When |
 | --- | --- | --- |
-| `update:modelValue` | `FieldMap` | The working copy changed. |
+| `update:modelValue` | `FieldMap` | The working copy changed (genuine user edit only — never echoes a resync). |
 | `detected` | `{ message, count, fields }` | Detect-from-sample succeeded. |
 | `imported` | `{ message, count, fields }` | Import succeeded. |
 | `success` | `{ message, count? }` | Detect **or** import succeeded (fires alongside `detected`/`imported`). |
 | `error` | `{ message }` | Detect / import failed. |
+| `template-active` | `{ id, name }` | The active field map now matches a template (`id`/`name`), or none (`null`). |
+| `templates-change` | `{ templates }` | The template library changed (add/rename/delete/modify). |
 
 > `detected`/`imported` and `success` fire **together** on success — toast on one of them, not
 > both, or you'll get duplicate notifications.
 
 Named slots (each receives scoped props bound to the composable handles): `#header`, `#presets`,
+`#templates` (`{ templates, activeId, editingId, draftName, select, add, startRename, commitRename, remove, disabled }`),
 `#help`, `#fields`, `#field` (per-row: `{ field, value, setField, disabled, inputId }`),
 `#group-label` (`{ title }`), `#preview` (`{ payload }`),
 `#detect` (`{ sampleText, runDetect, detectError, disabled }`),
@@ -150,6 +157,36 @@ ref/getter so it resyncs on external changes). Returns:
 overrides the download sink, e.g. for tests). `DetectOutcome` / `ImportOutcome` are
 `{ ok: true; count; fields } | { ok: false; error }`. Also exported: `GROUPS`, `PRESET_BUTTONS`,
 and types `FieldDef`, `MailInterfaceEditorOptions`, `MailInterfaceEditorResult`.
+
+### `useTemplateStore(options?)` — client-side template library
+
+A managed collection of named field maps with CRUD + persistence. The engine behind the SFC's
+template manager; usable headless. `MailTemplate = { id, name, fields: FieldMap }`.
+
+| Option | Default | Notes |
+| --- | --- | --- |
+| `storage` | localStorage adapter | `false` = in-memory only; or pass a custom `{ load(), save() }` adapter (server API, test spy). |
+| `storageKey` | `'ep-mail-templates'` | Key for the default localStorage adapter. |
+| `defaults` | *(none)* | Seed used **only** when storage has never been written. Opt-in — pass `DEFAULT_TEMPLATES` to use the built-ins, or your own. The package never auto-injects. |
+| `initialActiveId` | first template | Resolved against the loaded list (stale ids fall back to the first). |
+
+Returns `{ templates, activeId, activeTemplate, activeFields, hasTemplates, selectTemplate,
+addTemplate, renameTemplate, deleteTemplate, updateTemplateFields, setActiveFields,
+duplicateTemplate, resetToDefaults }`. An explicit empty stored array means "cleared" (not
+re-seeded); `undefined` means "never stored" (seed from `defaults`). Also exports `DEFAULT_TEMPLATES`
+(the four built-in templates: `SMToGo` / `Resend-like` / `Custom Example` / `Blank`) and types
+`MailTemplate`, `TemplateStorage`, `UseTemplateStoreOptions`, `UseTemplateStoreResult`.
+
+### `useTemplateEditorBinding(modelValue, onUpdateModelValue, options?)` — editor ↔ store
+
+Wires `useMailInterfaceEditor` to a `useTemplateStore`: powers switch / add / rename / delete, with
+edits to the active template written back automatically (modify), and a load-vs-edit guard so
+loading a template never clobbers the one being left. The active-template highlight is derived
+from `modelValue`, so it stays correct after an external resync (e.g. discard). `v-model`
+semantics are unchanged: `onUpdateModelValue(fm)` fires only on genuine user edits. Returns
+`{ editor, store, templates, activeTemplateId, editingId, draftName, selectTemplate, addTemplate,
+startRename, commitRename, removeTemplate }`. `options`: `{ defaultTemplates?, storageKey?,
+templateStore?, disabled? }`.
 
 ### `--ep-*` theme variables
 

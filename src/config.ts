@@ -35,7 +35,7 @@ export const FieldMapSchema = z
   })
 export type FieldMap = z.infer<typeof FieldMapSchema>
 
-/** Built-in payload presets. `custom_example` is the legacy Power Automate shape. */
+/** Built-in payload presets. `custom_example` is the "Custom Example" trigger shape. */
 export const PRESETS = {
   /**
    * No preset base — `fields` is the complete, authoritative map. Used by
@@ -43,11 +43,11 @@ export const PRESETS = {
    * with an empty base, no preset key can ever leak into a re-imported map.
    */
   none: {},
-  /** SMTGo-style gateway: { from, to, subject, html }. */
+  /** SMToGo-style gateway: { from, to, subject, html }. */
   smtogo: { from: 'from', to: 'to', subject: 'subject', bodyHtml: 'html' },
   /** Resend-like relay: { from, to, subject, html, text }. */
   generic: { from: 'from', to: 'to', subject: 'subject', bodyHtml: 'html', bodyText: 'text' },
-  /** Minimal trigger shape: { email, subject, content }. (was 'powerautomate') */
+  /** Custom Example trigger shape: { email, subject, content }. */
   custom_example: { to: 'email', subject: 'subject', body: 'content' },
 } as const satisfies Record<string, FieldMap>
 
