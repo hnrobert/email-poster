@@ -189,8 +189,8 @@ Light by default, dark via `prefers-color-scheme`. Bring your own template strin
 pick a preset, map each logical field to a downstream key, watch a live payload preview, detect a
 map from a pasted sample request, or **import one from a JSON Schema** (an email-poster
 InterfaceDef, a standard draft-07 schema, or a webhook trigger schema — including Power
-Automate-style ones). It also manages a **template library** (switch / add / rename /
-delete; editing the active template updates it) so common field maps are one click away. Built on
+Automate-style ones). It also manages a **post-schemas library** (switch / add / rename /
+delete; editing the active schema updates it) so common field maps are one click away. Built on
 the browser-safe `email-poster/pure` subset (no `node:` builtins, no transport) — safe for the
 client bundle. Requires **Vue ≥ 3.4**.
 
@@ -227,50 +227,55 @@ const saving = ref(false)
 
 Events (wire to **your own** toast — the editor ships no UI framework): `detected`, `imported`,
 `success` each carry `{ message, count?, fields? }`; `error` carries `{ message }`;
-`template-active` carries `{ id, name }`; `templates-change` carries `{ templates }`.
+`schema-active` carries `{ id, name }`; `schemas-change` carries `{ schemas }`.
 
-### Multi-template library
+### Post-schemas library
 
-By default the editor shows a **template manager** above the field rows — a list of named field
+A **post schema** is a named `FieldMap` — a saved mapping of logical email field → downstream JSON
+key that defines the *payload structure* of the POST webhook. It is **not** an email body template
+(the HTML/text rendering lives in `email-poster/template`); these schemas only describe the webhook
+payload, so the two are kept separate.
+
+By default the editor shows a **schema manager** above the field rows — a list of named field
 maps the operator can switch between, add to, rename, and delete. Editing the fields of the active
-template writes back to it automatically (so a template stays in sync with what you last edited).
+schema writes back to it automatically (so a schema stays in sync with what you last edited).
 
-**The consuming application owns template storage** — not the browser. Persistence goes through a
+**The consuming application owns schema storage** — not the browser. Persistence goes through a
 `storage` adapter the consumer provides, and the package ships a localStorage adapter as a
 ready-made default. For a server app the intended pattern is a **custom adapter that loads/saves
-against your own backend** (database / API), so templates are shared across operators and survive
+against your own backend** (database / API), so schemas are shared across operators and survive
 a browser switch rather than living in one browser's `localStorage`. The library seeds, the first
 time only, from the package's built-ins (`SMToGo` / `Resend-like` / `Custom Example` / `Blank`) —
 the same shapes as the presets — unless the consumer opts out.
 
 ```vue
 <MailInterfaceEditor v-model="fieldMap" :disabled="saving" />
-<!-- template manager on by default; v-model still reflects the active field map -->
+<!-- schema manager on by default; v-model still reflects the active field map -->
 ```
 
 | Prop | Default | Purpose |
 | --- | --- | --- |
-| `manageTemplates` | `true` | Render the template manager. Set `false` for the legacy fixed-preset buttons. |
-| `defaultTemplates` | `DEFAULT_TEMPLATES` | Seed used when storage is empty. Pass `[]` to start blank, or your own list. |
-| `storageKey` | `'ep-mail-templates'` | `localStorage` key for the built-in adapter. |
-| `templateStore` | *(internal)* | Inject your own `useTemplateStore()` — to share one store across components or swap the storage adapter (e.g. a server-backed one). |
+| `manageSchemas` | `true` | Render the schema manager. Set `false` for the legacy fixed-preset buttons. |
+| `defaultSchemas` | `DEFAULT_SCHEMAS` | Seed used when storage is empty. Pass `[]` to start blank, or your own list. |
+| `storageKey` | `'ep-mail-schemas'` | `localStorage` key for the built-in adapter. |
+| `schemaStore` | *(internal)* | Inject your own `useSchemaStore()` — to share one store across components or swap the storage adapter (e.g. a server-backed one). |
 
-The store is the consumer's storage for templates; `v-model` is the active field map your server
+The store is the consumer's storage for schemas; `v-model` is the active field map your server
 persists. They're decoupled by design: the library is a palette of field maps, and the selected
-one's fields flow out through `v-model`. To persist templates somewhere other than `localStorage`
+one's fields flow out through `v-model`. To persist schemas somewhere other than `localStorage`
 — your own backend, an in-memory spy for tests, or not at all — build the store yourself and pass
 it in:
 
 ```ts
-import { MailInterfaceEditor, useTemplateStore, DEFAULT_TEMPLATES } from 'email-poster/vue'
+import { MailInterfaceEditor, useSchemaStore, DEFAULT_SCHEMAS } from 'email-poster/vue'
 
 // Back the library with your own backend: load() returns the saved list (or
-// undefined the first time, so it seeds DEFAULT_TEMPLATES), save() persists.
-const store = useTemplateStore({
-  defaults: DEFAULT_TEMPLATES,
+// undefined the first time, so it seeds DEFAULT_SCHEMAS), save() persists.
+const store = useSchemaStore({
+  defaults: DEFAULT_SCHEMAS,
   storage: {
-    load: () => props.templates,                 // fetched from your API
-    save: (t) => debouncePut('/api/templates', t), // persisted to your DB
+    load: () => props.schemas,                  // fetched from your API
+    save: (t) => debouncePut('/api/post-schemas', t), // persisted to your DB
   },
 })
 // in-memory only (e.g. tests): storage: false
@@ -287,7 +292,7 @@ Plain HTML + `.ep-*` classes, themed by `--ep-*` CSS variables. Defaults live un
 
 1. **Remap `--ep-*` to your tokens** — also gives you dark mode for free (example below).
 2. Target `.ep-*` classes directly (scoped styles may need higher specificity).
-3. Replace whole sections via named slots: `#header`, `#presets`, `#templates`, `#fields`,
+3. Replace whole sections via named slots: `#header`, `#presets`, `#schemas`, `#fields`,
    `#field` (per row), `#group-label`, `#preview`, `#detect`, `#actions`.
 4. Pass a root `class` through to `.ep-editor`.
 
@@ -312,13 +317,13 @@ All logic, zero markup:
 
 - `useMailInterfaceEditor(modelValue)` — the field-map editor: returns `{ fields, setField,
   applyPreset, activePreset, payloadPreview, runDetect, exportDef, exportSchema, onImportFile, … }`.
-- `useTemplateStore({ defaults?, storage?, storageKey? })` — the template library (CRUD +
+- `useSchemaStore({ defaults?, storage?, storageKey? })` — the post-schemas library (CRUD +
   persistence). The consumer owns storage via the `storage` adapter (localStorage by default; pass
-  your own to back it with a backend). Returns `{ templates, activeId, addTemplate, renameTemplate,
-  deleteTemplate, updateTemplateFields, duplicateTemplate, resetToDefaults, … }`. Importing the
-  built-in seed is opt-in: pass `defaults: DEFAULT_TEMPLATES` to use it, or omit to start empty.
-- `useTemplateEditorBinding(modelValue, onUpdateModelValue, options?)` — wires the editor to a
-  template store (the logic the SFC's template manager uses), so a fully custom UI gets
+  your own to back it with a backend). Returns `{ schemas, activeId, addSchema, renameSchema,
+  deleteSchema, updateSchemaFields, duplicateSchema, resetToDefaults, … }`. Importing the
+  built-in seed is opt-in: pass `defaults: DEFAULT_SCHEMAS` to use it, or omit to start empty.
+- `useSchemaEditorBinding(modelValue, onUpdateModelValue, options?)` — wires the editor to a
+  schema store (the logic the SFC's schema manager uses), so a fully custom UI gets
   switch/add/rename/delete/modify for free.
 
 Full return shapes, the SFC's props/emits/slots, and the complete `--ep-*` variable list are in the

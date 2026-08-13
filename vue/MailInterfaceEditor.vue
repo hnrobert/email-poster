@@ -4,8 +4,8 @@
  * key). Dependency-free, restyle-able SFC. `v-model` is the FieldMap object.
  *
  * This file is only the render layer. All state/logic lives in two composables:
- *  - `useTemplateEditorBinding` — wires the field-map editor to a template
- *    library (switch / add / rename / delete; edits modify the active template;
+ *  - `useSchemaEditorBinding` — wires the field-map editor to a schema
+ *    library (switch / add / rename / delete; edits modify the active schema;
  *    highlight derived from `modelValue`). See that module for the exact
  *    semantics, which are unit-tested.
  *  - `useMailInterfaceEditor` — the field-map editor itself (field rows, body
@@ -14,17 +14,17 @@
  * Notifications are emitted as events (`detected` / `imported` / `error` /
  * `success`) so consumers wire their own toast.
  *
- * ## Multi-template manager
- * When `manageTemplates` is on (default), a template library replaces the fixed
- * preset buttons. The consuming application owns template storage: persistence
+ * ## Multi-schema manager
+ * When `manageSchemas` is on (default), a schema library replaces the fixed
+ * preset buttons. The consuming application owns schema storage: persistence
  * goes through a `storage` adapter, and the built-in default is a localStorage
- * adapter keyed by `storageKey`. For a server app, pass your own `templateStore`
- * whose adapter loads/saves against your backend (so templates are shared and
- * durable, not per-browser). The library seeds from `defaultTemplates` (defaults
- * to the package's `DEFAULT_TEMPLATES`) the first time only — pass
- * `:default-templates="[]"` to start empty, or your own list. `v-model` keeps
+ * adapter keyed by `storageKey`. For a server app, pass your own `schemaStore`
+ * whose adapter loads/saves against your backend (so schemas are shared and
+ * durable, not per-browser). The library seeds from `defaultSchemas` (defaults
+ * to the package's `DEFAULT_SCHEMAS`) the first time only — pass
+ * `:default-schemas="[]"` to start empty, or your own list. `v-model` keeps
  * its parent-driven semantics: it always reflects the active field map and is
- * never clobbered on mount. Set `manageTemplates` to `false` for the legacy
+ * never clobbered on mount. Set `manageSchemas` to `false` for the legacy
  * fixed-preset behavior.
  *
  * Styling: plain HTML + `.ep-*` classes + `--ep-*` CSS custom properties. See
@@ -34,28 +34,28 @@
  * @license Apache-2.0
  */
 import { watch } from 'vue'
-import { useTemplateEditorBinding } from './useTemplateEditorBinding'
-import { DEFAULT_TEMPLATES, type MailTemplate, type UseTemplateStoreResult } from './useTemplateStore'
+import { useSchemaEditorBinding } from './useSchemaEditorBinding'
+import { DEFAULT_SCHEMAS, type PostSchema, type UseSchemaStoreResult } from './useSchemaStore'
 import type { FieldMap } from 'email-poster/pure'
 
 const props = withDefaults(
   defineProps<{
     modelValue: FieldMap
     disabled?: boolean
-    /** Render the template manager (switch/add/rename/delete/modify). Default `true`. */
-    manageTemplates?: boolean
-    /** Seed templates used when the store's storage is empty. Default `DEFAULT_TEMPLATES`. */
-    defaultTemplates?: MailTemplate[]
-    /** localStorage key for the built-in adapter. Default `'ep-mail-templates'`. */
+    /** Render the schema manager (switch/add/rename/delete/modify). Default `true`. */
+    manageSchemas?: boolean
+    /** Seed schemas used when the store's storage is empty. Default `DEFAULT_SCHEMAS`. */
+    defaultSchemas?: PostSchema[]
+    /** localStorage key for the built-in adapter. Default `'ep-mail-schemas'`. */
     storageKey?: string
     /** Inject your own store (e.g. one whose adapter backs it with your backend). */
-    templateStore?: UseTemplateStoreResult
+    schemaStore?: UseSchemaStoreResult
   }>(),
   {
     disabled: false,
-    manageTemplates: true,
-    defaultTemplates: () => DEFAULT_TEMPLATES,
-    storageKey: 'ep-mail-templates',
+    manageSchemas: true,
+    defaultSchemas: () => DEFAULT_SCHEMAS,
+    storageKey: 'ep-mail-schemas',
   },
 )
 const emit = defineEmits<{
@@ -64,33 +64,33 @@ const emit = defineEmits<{
   imported: [{ message: string; count: number; fields: FieldMap }]
   error: [{ message: string }]
   success: [{ message: string; count?: number }]
-  /** The active field map no longer matches any saved template (or now matches one). */
-  'template-active': [{ id: string | null; name: string | null }]
-  /** The template library changed (add/rename/delete/modify). */
-  'templates-change': [{ templates: MailTemplate[] }]
+  /** The active field map no longer matches any saved schema (or now matches one). */
+  'schema-active': [{ id: string | null; name: string | null }]
+  /** The schema library changed (add/rename/delete/modify). */
+  'schemas-change': [{ schemas: PostSchema[] }]
 }>()
 
-const b = useTemplateEditorBinding(
+const b = useSchemaEditorBinding(
   () => props.modelValue,
   (fm) => emit('update:modelValue', fm),
   {
-    defaultTemplates: props.defaultTemplates,
+    defaultSchemas: props.defaultSchemas,
     storageKey: props.storageKey,
-    templateStore: props.templateStore,
+    schemaStore: props.schemaStore,
     disabled: () => props.disabled,
   },
 )
 const {
   editor: c,
-  templates,
-  activeTemplateId,
+  schemas,
+  activeSchemaId,
   editingId,
   draftName,
-  selectTemplate,
-  addTemplate,
+  selectSchema,
+  addSchema,
   startRename,
   commitRename,
-  removeTemplate,
+  removeSchema,
 } = b
 const {
   fields,
@@ -110,14 +110,14 @@ const {
   onImportFile,
 } = c
 
-// Surface template-library changes as events for consumers that sync elsewhere.
-watch(activeTemplateId, (id) => {
-  const t = templates.value.find((x) => x.id === id)
-  emit('template-active', { id, name: t?.name ?? null })
+// Surface schema-library changes as events for consumers that sync elsewhere.
+watch(activeSchemaId, (id) => {
+  const t = schemas.value.find((x) => x.id === id)
+  emit('schema-active', { id, name: t?.name ?? null })
 })
 watch(
-  templates,
-  (next) => emit('templates-change', { templates: next }),
+  schemas,
+  (next) => emit('schemas-change', { schemas: next }),
   { deep: true },
 )
 
@@ -157,7 +157,7 @@ async function onImport(e: Event): Promise<void> {
         <div class="ep-header__main">
           <h3 class="ep-title">Payload interface</h3>
           <slot
-            v-if="!manageTemplates"
+            v-if="!manageSchemas"
             name="presets"
             :active-preset="activePreset"
             :apply-preset="applyPreset"
@@ -183,7 +183,7 @@ async function onImport(e: Event): Promise<void> {
         </div>
         <slot name="help">
           <p class="ep-help">
-            Map each logical field to the downstream JSON key your webhook expects. Pick a template to
+            Map each logical field to the downstream JSON key your webhook expects. Pick a schema to
             load a preset, or map every key yourself; <code>body</code> and
             <code>bodyHtml</code>/<code>bodyText</code> are mutually exclusive.
           </p>
@@ -191,62 +191,62 @@ async function onImport(e: Event): Promise<void> {
       </section>
     </slot>
 
-    <!-- Template manager (switch / add / rename / delete; edits modify the active one) -->
+    <!-- Schema manager (switch / add / rename / delete; edits modify the active one) -->
     <slot
-      v-if="manageTemplates"
-      name="templates"
-      :templates="templates"
-      :active-id="activeTemplateId"
+      v-if="manageSchemas"
+      name="schemas"
+      :schemas="schemas"
+      :active-id="activeSchemaId"
       :editing-id="editingId"
       :draft-name="draftName"
-      :select="selectTemplate"
-      :add="addTemplate"
+      :select="selectSchema"
+      :add="addSchema"
       :start-rename="startRename"
       :commit-rename="commitRename"
-      :remove="removeTemplate"
+      :remove="removeSchema"
       :disabled="isDisabled"
     >
-      <section class="ep-templates">
-        <div class="ep-templates__head">
-          <h4 class="ep-group__title">Templates</h4>
+      <section class="ep-schemas">
+        <div class="ep-schemas__head">
+          <h4 class="ep-group__title">Schemas</h4>
           <button
             type="button"
             class="ep-btn ep-btn--sm ep-btn--outline"
             :disabled="isDisabled"
-            @click="addTemplate"
+            @click="addSchema"
           >
             + New
           </button>
         </div>
-        <ul v-if="templates.length" class="ep-templates__list">
+        <ul v-if="schemas.length" class="ep-schemas__list">
           <li
-            v-for="t in templates"
+            v-for="t in schemas"
             :key="t.id"
-            class="ep-template"
-            :class="{ 'ep-template--active': activeTemplateId === t.id }"
+            class="ep-schema"
+            :class="{ 'ep-schema--active': activeSchemaId === t.id }"
           >
             <button
               v-if="editingId !== t.id"
               type="button"
-              class="ep-template__select"
-              :aria-pressed="activeTemplateId === t.id ? 'true' : 'false'"
+              class="ep-schema__select"
+              :aria-pressed="activeSchemaId === t.id ? 'true' : 'false'"
               :disabled="isDisabled"
               :title="`Load “${t.name}”`"
-              @click="selectTemplate(t.id)"
+              @click="selectSchema(t.id)"
             >
-              <span class="ep-template__dot" aria-hidden="true"></span>
-              <span class="ep-template__name">{{ t.name }}</span>
+              <span class="ep-schema__dot" aria-hidden="true"></span>
+              <span class="ep-schema__name">{{ t.name }}</span>
             </button>
             <input
               v-else
               v-model="draftName"
-              class="ep-template__rename"
+              class="ep-schema__rename"
               type="text"
               :disabled="isDisabled"
               @keyup.enter="commitRename(t.id)"
               @blur="commitRename(t.id)"
             />
-            <span v-if="editingId !== t.id" class="ep-template__actions">
+            <span v-if="editingId !== t.id" class="ep-schema__actions">
               <button
                 type="button"
                 class="ep-btn ep-btn--sm ep-btn--ghost"
@@ -263,7 +263,7 @@ async function onImport(e: Event): Promise<void> {
                 :disabled="isDisabled"
                 title="Delete"
                 aria-label="Delete"
-                @click="removeTemplate(t.id)"
+                @click="removeSchema(t.id)"
               >
                 ✕
               </button>
@@ -271,7 +271,7 @@ async function onImport(e: Event): Promise<void> {
           </li>
         </ul>
         <p v-else class="ep-help">
-          No templates yet — click “+ New” to save the current field map as a template.
+          No schemas yet — click “+ New” to save the current field map as a schema.
         </p>
       </section>
     </slot>
@@ -485,19 +485,19 @@ async function onImport(e: Event): Promise<void> {
   font-family: var(--ep-font-mono);
 }
 
-/* Template manager */
-.ep-templates {
+/* Schema manager */
+.ep-schemas {
   display: flex;
   flex-direction: column;
   gap: var(--ep-space-group);
 }
-.ep-templates__head {
+.ep-schemas__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--ep-gap-field);
 }
-.ep-templates__list {
+.ep-schemas__list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -505,7 +505,7 @@ async function onImport(e: Event): Promise<void> {
   flex-direction: column;
   gap: var(--ep-space-row);
 }
-.ep-template {
+.ep-schema {
   display: flex;
   align-items: center;
   gap: var(--ep-gap-field);
@@ -514,11 +514,11 @@ async function onImport(e: Event): Promise<void> {
   border-radius: var(--ep-radius-sm);
   background: var(--ep-color-bg);
 }
-.ep-template--active {
+.ep-schema--active {
   border-color: var(--ep-color-primary-border);
   background: var(--ep-color-muted-bg);
 }
-.ep-template__select {
+.ep-schema__select {
   display: flex;
   align-items: center;
   gap: var(--ep-space-row);
@@ -532,7 +532,7 @@ async function onImport(e: Event): Promise<void> {
   cursor: pointer;
   text-align: left;
 }
-.ep-template__dot {
+.ep-schema__dot {
   width: 0.5rem;
   height: 0.5rem;
   flex: none;
@@ -540,16 +540,16 @@ async function onImport(e: Event): Promise<void> {
   border: 1px solid var(--ep-color-border);
   background: transparent;
 }
-.ep-template--active .ep-template__dot {
+.ep-schema--active .ep-schema__dot {
   background: var(--ep-color-primary);
   border-color: var(--ep-color-primary-border);
 }
-.ep-template__name {
+.ep-schema__name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ep-template__rename {
+.ep-schema__rename {
   flex: 1 1 auto;
   min-width: 0;
   font: inherit;
@@ -559,11 +559,11 @@ async function onImport(e: Event): Promise<void> {
   border-radius: var(--ep-radius-sm);
   padding: 0.25rem 0.5rem;
 }
-.ep-template__rename:focus-visible {
+.ep-schema__rename:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--ep-color-ring);
 }
-.ep-template__actions {
+.ep-schema__actions {
   display: flex;
   gap: var(--ep-gap-btn);
   flex: none;

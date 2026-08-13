@@ -18,17 +18,17 @@ export {
   type MailInterfaceEditorResult,
 } from './useMailInterfaceEditor'
 export {
-  DEFAULT_TEMPLATES,
-  useTemplateStore,
-  type MailTemplate,
-  type TemplateStorage,
-  type UseTemplateStoreOptions,
-  type UseTemplateStoreResult,
-} from './useTemplateStore'
+  DEFAULT_SCHEMAS,
+  useSchemaStore,
+  type PostSchema,
+  type SchemaStorage,
+  type UseSchemaStoreOptions,
+  type UseSchemaStoreResult,
+} from './useSchemaStore'
 export {
-  useTemplateEditorBinding,
-  type UseTemplateEditorBindingOptions,
-  type UseTemplateEditorBindingResult,
-} from './useTemplateEditorBinding'
+  useSchemaEditorBinding,
+  type UseSchemaEditorBindingOptions,
+  type UseSchemaEditorBindingResult,
+} from './useSchemaEditorBinding'
 // Re-export the types consumers need to annotate their v-model.
 export type { FieldMap, PresetName } from 'email-poster/pure'

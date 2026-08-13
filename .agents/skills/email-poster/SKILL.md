@@ -94,14 +94,14 @@ With split keys, sending `type:'html'` when only `bodyText` is mapped throws `VA
 ## 6. Visual field-map editor (`email-poster/vue`)
 
 A restyle-able Vue editor for the `fields` map — drop into admin UIs so operators map fields
-visually instead of editing JSON: a **client-side template library** (switch / add / rename /
-delete; editing the active template updates it), 13 grouped field rows with live body-XOR, a
+visually instead of editing JSON: a **post-schemas library** (switch / add / rename /
+delete; editing the active schema updates it), 13 grouped field rows with live body-XOR, a
 live downstream-payload preview, detect-from-sample, and import/export (InterfaceDef JSON or
 JSON Schema). Ships a ready `<MailInterfaceEditor>` SFC and headless composables
-(`useMailInterfaceEditor()`, `useTemplateStore()` + `DEFAULT_TEMPLATES`,
-`useTemplateEditorBinding()`). Templates persist to `localStorage` by default and seed, on first
+(`useMailInterfaceEditor()`, `useSchemaStore()` + `DEFAULT_SCHEMAS`,
+`useSchemaEditorBinding()`). Schemas persist to `localStorage` by default and seed, on first
 use, from the built-in presets (SMToGo / Resend-like / Custom Example / Blank); importing the
-seed is opt-in (`defaults: DEFAULT_TEMPLATES`). Browser-safe (depends only on `vue` +
+seed is opt-in (`defaults: DEFAULT_SCHEMAS`). Browser-safe (depends only on `vue` +
 `email-poster/pure`). Requires Vue ≥ 3.4 and `vite.optimizeDeps.exclude: ['email-poster']` (the
 SFC ships as `.vue` source). See `reference.md` for the full props / emits / slots / composable /
 `--ep-*` CSS-variable API.
