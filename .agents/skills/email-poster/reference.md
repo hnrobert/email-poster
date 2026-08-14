@@ -95,6 +95,88 @@ import {
 | `importInterface(json)` | Load an `InterfaceDef` **or** a standard JSON Schema → `InterfaceDef`. |
 | `exportPayloadSchema(def)` | Derive a draft-07 JSON Schema of the downstream payload. |
 
+## HTML email templates: `email-poster/template`
+
+Browser-safe rendering (no `node:` imports) for the email **body** — the HTML the recipient
+sees. These are *email body templates*, entirely separate from the **post-schema presets**
+(`PRESETS` in `email-poster/pure`), which describe the webhook JSON payload.
+
+### `EmailTheme`
+
+Passed as the 2nd argument to every preset renderer; brands all six presets at once:
+
+```ts
+import type { EmailTheme } from 'email-poster/template'
+
+const theme: EmailTheme = {
+  brandTitle: 'Acme',                     // header brand name (default 'email-poster')
+  brandSubtitle: 'Freshmen 2026',         // muted line under the brand
+  logo: 'https://x/logo.png',             // header icon; <img> omitted entirely when unset
+  primaryColor: '#2563eb',                // CTA/badge color (see safeColor below)
+  footerHtml: 'Acme · no-reply@example.com', // raw HTML (default 'Sent via email-poster · © year')
+  extraCss: '.brand-title { letter-spacing: .5px; }', // appended inside <style>
+  year: 2026,                             // override the footer year
+}
+```
+
+- `safeColor(c)` — whitelists `#rgb` / `#rrggbb` / `#rrggbbaa` only; anything else (including
+  injection attempts) falls back to `DEFAULT_PRIMARY_COLOR` (`'#F7D447'`).
+- `readableForeground(hex)` — perceived-luminance contrast; returns `'#1c1917'` (dark ink) or
+  `'#fafafa'` (light ink). Used automatically on the CTA and the `welcome` badge.
+
+### Presets
+
+| Name | Renderer | Content (`*` = required) |
+| --- | --- | --- |
+| `card` | `renderCardEmail` | `title*`, `bodyHtml*`, `actionLabel?`, `actionUrl?`, `preheader?` |
+| `code` | `renderCodeEmail` | `code*` (36px letter-spaced mono hero), `title?` (default `'Your verification code'`), `leadHtml?`, `hintHtml?`, `action…`, `preheader?` |
+| `welcome` | `renderWelcomeEmail` | `bodyHtml*`, `title?` (default `'Welcome'`), `badgeText?` (primary-color pill), `titleIconUrl?`, `heroImageUrl?`, `action…`, `preheader?` |
+| `receipt` | `renderReceiptEmail` | `title*`, `rows*: {label, value}[]`, `bodyHtml?`, `totalLabel?`+`totalValue?` (emphasized total row), `noteHtml?`, `action…`, `preheader?` |
+| `alert` | `renderAlertEmail` | `level?` (`'success'\|'warning'\|'error'\|'info'`, default info), `title*`, `bodyHtml*`, `details?: string[]` (bulleted), `action…`, `preheader?` |
+| `plain` | `renderPlainEmail` | `bodyHtml*`, `preheader?` — no card/header/footer chrome |
+
+`action…` = `actionLabel?` + `actionUrl?`; the primary-color CTA renders only when **both**
+are set. `preheader` is the hidden inbox preview text.
+
+```ts
+import { renderEmail, renderCodeEmail } from 'email-poster/template'
+
+renderEmail('welcome', { badgeText: "New '26", bodyHtml: '<p>You are in!</p>',
+                         actionLabel: 'Get started', actionUrl: 'https://x/start' }, theme)
+renderCodeEmail({ code: '123456', hintHtml: '<p>Expires in 10 minutes.</p>' }, theme)
+```
+
+`renderEmail(name, content, theme?)` dispatches by name (per-name overloads → typed content;
+unknown name → `TypeError`). Also exported: each `renderX` directly, and `EMAIL_TEMPLATES` —
+`Record<'card'|'code'|'welcome'|'receipt'|'alert'|'plain', string>`.
+
+`alert` palettes (`ALERT_PALETTES`): success `#f0fdf4`/`#16a34a`, warning `#fffbeb`/`#d97706`,
+error `#fef2f2`/`#dc2626`, info `#eff6ff`/`#2563eb` (panel bg / accent border+heading).
+
+### Legacy + custom templates
+
+- `renderEmailCard(c, opts?, template?)` — the original single-template helper, unchanged
+  (byte-identical output). `DEFAULT_TEMPLATE` is frozen for back-compat.
+- Every preset renderer takes a trailing `template` string — copy an exported `*_TEMPLATE`
+  (`CARD_TEMPLATE`, `CODE_TEMPLATE`, `WELCOME_TEMPLATE`, `RECEIPT_TEMPLATE`, `ALERT_TEMPLATE`,
+  `PLAIN_TEMPLATE`) and edit it.
+- `EMAIL_SHELL` is the shared full-document skeleton; `composeShellTemplate(fragment)` splices
+  a content fragment into its `{{CONTENT}}` slot; `shellVars(resolvedTheme)` returns the
+  theme-derived escaped/raw token maps (incl. `{{PRIMARY_COLOR}}`/`{{PRIMARY_INK}}` for
+  custom shells).
+- Shell tokens: `{{PREHEADER}}` `{{TITLE}}` `{{BRAND_TITLE}}` `{{BRAND_SUBTITLE}}`
+  `{{LOGO_BLOCK}}` `{{CONTENT}}` `{{FOOTER_HTML}}` `{{EXTRA_CSS}}`.
+- Primitives: `renderTemplate(tpl, escapedVars?, rawVars?)` (token replace; escaped values
+  pass through `escapeHtml`, raw insert verbatim, unmapped tokens stay) and `escapeHtml`.
+
+### Escaping & dark mode
+
+Escaped automatically: `title`, `brandTitle`, `brandSubtitle`, `badgeText`, `code`,
+`preheader`, receipt labels/values, `details[]`, `actionLabel`, and all URLs. Raw (trusted
+HTML you supply): `bodyHtml`, `leadHtml`, `hintHtml`, `noteHtml`, `footerHtml`, `extraCss`.
+Light by default, dark via `prefers-color-scheme` (`!important` class overrides, critical
+styles inline); clients without media-query support (Outlook desktop) show light.
+
 ## Visual editor: `email-poster/vue`
 
 A restyle-able editor for a `FieldMap` — a ready SFC plus a headless composable. Browser-safe

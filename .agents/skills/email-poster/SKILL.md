@@ -9,7 +9,9 @@ Schema-driven email sending over HTTP POST webhooks. Declare how logical fields
 `{to, subject, body, type}` map onto the JSON keys your downstream expects (or
 pick a preset), then one `send()` call validates → assembles → POSTs → parses
 the messageId. Built-in timeout, exponential-backoff retry, abort support, an
-opt-in SSRF guard, hooks, and HTML template rendering.
+opt-in SSRF guard, hooks, and HTML template rendering — six themed email body
+presets (`card` / `code` / `welcome` / `receipt` / `alert` / `plain`) where you
+supply content + an `EmailTheme` and never hand-roll email HTML again.
 
 ## Install this skill
 
@@ -33,6 +35,7 @@ Manual copy: `cp -R node_modules/email-poster/.agents/skills/email-poster ~/.cla
 - Multiple services copy-paste the same `sendViaPost` `fetch(...)` block — consolidate it.
 - The downstream wants non-standard keys (`email` instead of `to`, `content` instead of `body`, …).
 - The user wants a visual UI for editing the field map (presets, live payload preview, detect-from-sample, import/export) — `email-poster/vue`.
+- The user wants good transactional HTML emails (verification codes, receipts, alerts, welcome mail) without hand-rolling markup — the themed presets in `email-poster/template`.
 
 **Don't use it for:** direct SMTP (nodemailer), or a single managed vendor SDK (Resend/SendGrid/Courier) where you'd rather use their first-party client.
 

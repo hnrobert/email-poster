@@ -171,16 +171,107 @@ attempt). `afterSend`/`onError` are fire-and-forget; hook errors are warned, nev
 
 ## HTML template (optional subpath)
 
+Browser-safe rendering (no `node:` imports) for the email **body** — the HTML the recipient
+sees. Supply content + an [`EmailTheme`](#theming); the presets handle all markup, inline
+styles, and dark mode. (These are email *body templates* — unrelated to the *post-schema
+presets* in `email-poster/pure`, which describe the webhook JSON payload.)
+
+```ts
+import { renderEmail } from 'email-poster/template'
+const html = renderEmail('code', { code: '123456', hintHtml: '<p>Expires in 10 minutes.</p>' }, {
+  brandTitle: 'Acme', logo: 'https://x/logo.png', primaryColor: '#2563eb',
+})
+await mail.send({ to: 'a@b.c', subject: 'Your verification code', body: html })
+```
+
+The original single-template helper is still exported (`renderEmailCard`, byte-identical):
+
 ```ts
 import { renderEmailCard } from 'email-poster/template'
 const html = renderEmailCard(
   { title: 'Welcome', bodyHtml: '<p>Hi</p>', actionLabel: 'Verify', actionUrl: 'https://x/v' },
   { brandTitle: 'Acme', logo: 'https://x/logo.png' },
 )
-await mail.send({ to: 'a@b.c', subject: 'Welcome', body: html })
 ```
 
-Light by default, dark via `prefers-color-scheme`. Bring your own template string if needed.
+### Theming
+
+Every preset renderer takes `(content, theme?)`. One theme object brands them all:
+
+```ts
+import type { EmailTheme } from 'email-poster/template'
+
+const theme: EmailTheme = {
+  brandTitle: 'Acme',            // header brand name (default 'email-poster')
+  brandSubtitle: 'Freshmen 2026',// muted line under the brand
+  logo: 'https://x/logo.png',    // header icon URL — the <img> is omitted entirely when unset
+  primaryColor: '#2563eb',       // CTA/badge color; #rgb/#rrggbb/#rrggbbaa only (default '#F7D447')
+  footerHtml: 'Acme · no-reply@example.com', // raw HTML (default 'Sent via email-poster · © year')
+  extraCss: '.brand-title { letter-spacing: .5px; }', // appended inside the <style> block
+  year: 2026,                    // override the footer year
+}
+```
+
+The CTA button (and the `welcome` badge) automatically pick a readable foreground for
+`primaryColor` via perceived-luminance contrast (`readableForeground`), and `primaryColor` is
+whitelisted through `safeColor` — anything that isn't a plain hex falls back to the default
+yellow, so a hostile color string can never inject CSS.
+
+### Presets
+
+| Name | Renderer | Content model |
+| --- | --- | --- |
+| `card` | `renderCardEmail` | `{ title, bodyHtml, actionLabel?, actionUrl?, preheader? }` |
+| `code` | `renderCodeEmail` | `{ code, title?, leadHtml?, hintHtml?, action…, preheader? }` — 36px letter-spaced mono hero |
+| `welcome` | `renderWelcomeEmail` | `{ title?, badgeText?, titleIconUrl?, heroImageUrl?, bodyHtml, action…, preheader? }` |
+| `receipt` | `renderReceiptEmail` | `{ title, bodyHtml?, rows: {label, value}[], totalLabel?, totalValue?, noteHtml?, action…, preheader? }` |
+| `alert` | `renderAlertEmail` | `{ level?: 'success'\|'warning'\|'error'\|'info', title, bodyHtml, details?: string[], action…, preheader? }` |
+| `plain` | `renderPlainEmail` | `{ bodyHtml, preheader? }` — no card chrome at all |
+
+`actionLabel`/`actionUrl` render a primary-color CTA when **both** are present; `preheader`
+is the hidden inbox preview text. `renderEmail(name, content, theme?)` dispatches by name
+(unknown name → `TypeError`); each renderer is also exported directly, and `EMAIL_TEMPLATES`
+maps name → template string.
+
+```ts
+import { renderAlertEmail, renderReceiptEmail } from 'email-poster/template'
+
+renderAlertEmail({ level: 'error', title: 'Sync failed', bodyHtml: '<p>3 items rejected.</p>',
+                  details: ['row 12: bad email', 'row 18: duplicate'], actionLabel: 'View report',
+                  actionUrl: 'https://x/r' }, theme)
+
+renderReceiptEmail({ title: 'Your order', rows: [{ label: 'Ticket', value: '¥120' }],
+                     totalLabel: 'Total', totalValue: '¥120' }, theme)
+```
+
+### Custom templates
+
+Every renderer accepts a trailing `template` string — the escape hatch. Start from an exported
+`*_TEMPLATE` (or compose a whole shell with `EMAIL_SHELL` + `composeShellTemplate(fragment)`)
+and edit:
+
+```ts
+import { renderCodeEmail, CODE_TEMPLATE, escapeHtml } from 'email-poster/template'
+
+const mine = CODE_TEMPLATE.replace('letter-spacing: 10px', 'letter-spacing: 6px')
+const html = renderCodeEmail({ code: '123456' }, theme, mine)
+```
+
+`EMAIL_SHELL` tokens: `{{PREHEADER}}` `{{TITLE}}` `{{BRAND_TITLE}}` `{{BRAND_SUBTITLE}}`
+`{{LOGO_BLOCK}}` `{{CONTENT}}` `{{FOOTER_HTML}}` `{{EXTRA_CSS}}` — plus `{{PRIMARY_COLOR}}` /
+`{{PRIMARY_INK}}` provided via `shellVars()` for shells that want theme-colored chrome. The
+primitives are exported too: `renderTemplate(tpl, escapedVars, rawVars)` and `escapeHtml`.
+
+### Escaping & dark mode
+
+**Escaped automatically** (safe for text/attributes): `title`, `brandTitle`, `brandSubtitle`,
+`badgeText`, `code`, `preheader`, receipt labels/values, alert `details[]`, `actionLabel`, and
+all URLs (`actionUrl`, `logo`, `titleIconUrl`, `heroImageUrl`).
+**Raw — trusted HTML you supply:** `bodyHtml`, `leadHtml`, `hintHtml`, `noteHtml`,
+`footerHtml`, `extraCss`.
+**Dark mode:** light by default, dark via `prefers-color-scheme` (`!important` class
+overrides; all critical styling stays inline). Clients without media-query support —
+notably Outlook desktop — show the light version.
 
 ## Visual field-map editor (Vue, optional subpath)
 

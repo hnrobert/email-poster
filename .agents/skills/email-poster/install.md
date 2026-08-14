@@ -109,13 +109,19 @@ app.post('/mail', createMailRoute(poster))
 ## HTML template (optional subpath)
 
 ```ts
-import { renderEmailCard } from 'email-poster/template'
-const html = renderEmailCard(
-  { title: 'Welcome', bodyHtml: '<p>Hi there</p>', actionLabel: 'Verify', actionUrl: 'https://x/v' },
-  { brandTitle: 'Acme', logo: 'https://x/logo.png' },
-)
+import { renderEmail } from 'email-poster/template'
+const html = renderEmail('code', { code: '123456', hintHtml: '<p>Expires in 10 minutes.</p>' }, {
+  brandTitle: 'Acme', logo: 'https://x/logo.png', primaryColor: '#2563eb',
+})
 // pass `html` as the `body` with type:'html'
 ```
+
+Six themed presets — `card`, `code` (verification codes), `welcome`, `receipt` (line-item
+table), `alert` (success/warning/error/info), `plain` — take content + one `EmailTheme`
+(brand, logo, primaryColor, footer, extraCss); markup, inline styles, CTA contrast, and dark
+mode are handled for you. `renderX(...)` exports exist per preset, plus `renderEmailCard`
+(legacy single-template helper, unchanged), `EMAIL_TEMPLATES`, and a trailing custom
+`template` argument on every renderer. Full API → `reference.md`, "HTML email templates".
 
 ## Visual editor (Vue 3) subpath
 

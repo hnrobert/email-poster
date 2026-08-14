@@ -1,5 +1,9 @@
 # Presets — exact JSON each emits
 
+> These are **post-schema presets** — webhook payload field maps. They have nothing to do with
+> the preset HTML **email body templates** (`card`/`code`/`welcome`/…) in
+> `email-poster/template`; see `reference.md`, "HTML email templates".
+
 For `send({ to: 'a@b.c', subject: 'Hi', body: '<b>X</b>', from: 'f@x.com' })`.
 
 ## `smtogo` (default)

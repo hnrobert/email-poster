@@ -1,4 +1,5 @@
 import { DEFAULT_TEMPLATE } from './default-template'
+import { readableForeground, safeColor } from './theme'
 import type { EmailCardContent, RenderEmailCardOptions, TemplateVars } from './types'
 
 /** Escape the five significant HTML characters. */
@@ -38,6 +39,20 @@ export function actionBlock(c: EmailCardContent): string {
   const url = escapeHtml(c.actionUrl)
   const label = escapeHtml(c.actionLabel)
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 24px 0 4px;"><tr><td bgcolor="#F7D447" style="border-radius: 10px;"><a href="${url}" target="_blank" rel="noopener" style="display: inline-block; padding: 12px 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 600; color: #1c1917; text-decoration: none; border-radius: 10px;">${label}</a></td></tr></table>`
+}
+
+/**
+ * Themed variant of {@link actionBlock} for the preset templates: the button
+ * uses `primaryColor` (whitelisted via safeColor) with an auto-contrast
+ * foreground. Empty string when label or url is missing.
+ */
+export function themedActionBlock(label: string, url: string, primaryColor: string): string {
+  if (!label || !url) return ''
+  const bg = safeColor(primaryColor)
+  const ink = readableForeground(bg)
+  const href = escapeHtml(url)
+  const text = escapeHtml(label)
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 24px 0 4px;"><tr><td bgcolor="${bg}" style="border-radius: 10px;"><a href="${href}" target="_blank" rel="noopener" style="display: inline-block; padding: 12px 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 600; color: ${ink}; text-decoration: none; border-radius: 10px;">${text}</a></td></tr></table>`
 }
 
 /**
