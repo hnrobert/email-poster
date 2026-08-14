@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EmailPoster } from '../../src/poster'
 import { ErrorCode } from '../../src/errors'
 import type { SendMailInput } from '../../src/input'
+import type { AttemptInfo } from '../../src/types'
 
 type FetchMock = ReturnType<typeof vi.fn>
 
@@ -100,6 +101,57 @@ describe('EmailPoster.send (e2e, mocked fetch)', () => {
       mail.send({ to: 'a@b.c', subject: 's', body: 'b' }),
     ).rejects.toMatchObject({ code: ErrorCode.RETRY_EXHAUSTED, status: 503 })
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('onAttempt fires per attempt (retry then success)', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockResolvedValueOnce(jsonRes({ id: 'ok' }))
+    const mail = new EmailPoster({
+      postUrl: 'https://x.com',
+      preset: 'smtogo',
+      fromAddress: 'f@x.com',
+      retry: { codes: [503], maxAttempts: 3, baseDelayMs: 0, maxDelayMs: 0 },
+    })
+    const calls: AttemptInfo[] = []
+    const res = await mail.send(
+      { to: 'a@b.c', subject: 's', body: 'b' },
+      { onAttempt: (i) => calls.push(i) },
+    )
+    expect(res.messageId).toBe('ok')
+    expect(calls).toHaveLength(2)
+    expect(calls[0]).toMatchObject({
+      attempt: 1,
+      ok: false,
+      retryable: true,
+      status: 503,
+      errorKind: 'status',
+      message: 'Webhook returned 503',
+    })
+    expect(calls[0]!.backoffMs).toBe(0) // baseDelayMs 0
+    expect(calls[1]).toMatchObject({ attempt: 2, ok: true, retryable: false, status: 200 })
+  })
+
+  it('onAttempt fires once for a non-retryable failure (before the throw)', async () => {
+    fetchMock.mockResolvedValue(new Response('bad', { status: 400 }))
+    const mail = new EmailPoster({
+      postUrl: 'https://x.com',
+      preset: 'smtogo',
+      fromAddress: 'f@x.com',
+      retry: { codes: [503], maxAttempts: 3, baseDelayMs: 0, maxDelayMs: 0 },
+    })
+    const calls: AttemptInfo[] = []
+    await expect(
+      mail.send({ to: 'a@b.c', subject: 's', body: 'b' }, { onAttempt: (i) => calls.push(i) }),
+    ).rejects.toMatchObject({ code: ErrorCode.REQUEST_FAILED, status: 400 })
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatchObject({
+      attempt: 1,
+      ok: false,
+      retryable: false,
+      status: 400,
+      errorKind: 'status',
+    })
   })
 
   it('non-retryable 400 → REQUEST_FAILED immediately (no retry)', async () => {

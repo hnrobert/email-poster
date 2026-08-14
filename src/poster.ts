@@ -105,6 +105,7 @@ export class EmailPoster {
         signal: opts.signal,
         retry: this.config.retry,
         successCodes: this.config.successCodes,
+        onAttempt: opts.onAttempt,
       })
     } catch (e) {
       const err =

@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest'
 import { mkdtemp, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { main } from '../../cli/cli'
-import { parseHeaders, parseAttachments } from '../../cli/send'
+import { parseHeaders, parseAttachments, formatAttempt } from '../../cli/send'
 
 function jsonRes(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -38,15 +38,65 @@ describe('cli arg helpers', () => {
   })
 })
 
+describe('formatAttempt (verbose attempt formatting)', () => {
+  it('renders a success', () => {
+    expect(formatAttempt({ attempt: 1, maxAttempts: 3, ok: true, retryable: false, status: 200 })).toBe(
+      'attempt 1/3 → 200 OK',
+    )
+  })
+  it('renders a retryable status with backoff', () => {
+    expect(
+      formatAttempt({
+        attempt: 1,
+        maxAttempts: 3,
+        ok: false,
+        retryable: true,
+        status: 503,
+        backoffMs: 412,
+        errorKind: 'status',
+        message: 'Webhook returned 503',
+      }),
+    ).toBe('attempt 1/3 → status 503 (Webhook returned 503); retry in 412ms')
+  })
+  it('renders a terminal (non-retryable) status', () => {
+    expect(
+      formatAttempt({
+        attempt: 1,
+        maxAttempts: 3,
+        ok: false,
+        retryable: false,
+        status: 400,
+        errorKind: 'status',
+        message: 'Webhook returned 400',
+      }),
+    ).toBe('attempt 1/3 → status 400 (Webhook returned 400)')
+  })
+  it('renders a network error without a status', () => {
+    expect(
+      formatAttempt({
+        attempt: 2,
+        maxAttempts: 3,
+        ok: false,
+        retryable: true,
+        backoffMs: 0,
+        errorKind: 'network',
+        message: 'Network error during send',
+      }),
+    ).toBe('attempt 2/3 → network (Network error during send); retry in 0ms')
+  })
+})
+
 describe('cli main()', () => {
   type FetchMock = ReturnType<typeof vi.fn>
   let logSpy: ReturnType<typeof vi.spyOn>
   let errSpy: ReturnType<typeof vi.spyOn>
+  let stderrSpy: MockInstance
   let fetchMock: FetchMock
 
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined)
     errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     fetchMock = vi.spyOn(globalThis, 'fetch') as unknown as FetchMock
   })
   afterEach(() => {
@@ -95,10 +145,52 @@ describe('cli main()', () => {
     ])
     expect(code).toBe(0)
     const printed = JSON.parse(logSpy.mock.calls[0]![0] as string)
-    expect(printed).toEqual({ ok: true, messageId: 'msg-9', status: 200 })
+    expect(printed).toMatchObject({ ok: true, messageId: 'msg-9', status: 200 })
+    expect(typeof printed.elapsedMs).toBe('number')
     // auth header reached the fetch call
     const init = fetchMock.mock.calls[0]![1] as RequestInit
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer t')
+  })
+
+  it('-v / --verbose writes debug lines to stderr (headers redacted) and still succeeds', async () => {
+    fetchMock.mockResolvedValue(jsonRes({ id: 'v1' }))
+    const code = await main([
+      'send', '-v',
+      '--preset', 'smtogo',
+      '--url', 'https://x.com',
+      '--header', 'Authorization: Bearer secret-token',
+      '--to', 'a@b.c', '--subject', 's', '--body', 'b',
+    ])
+    expect(code).toBe(0)
+    const stderr = stderrSpy.mock.calls.map((c) => String(c[0])).join('')
+    // verbose config + attempt lines present
+    expect(stderr).toContain('[debug] target url: https://x.com')
+    expect(stderr).toContain('[debug] preset: smtogo')
+    expect(stderr).toContain('[debug] attempt 1/3 → 200 OK')
+    // the Authorization header is redacted, never leaked
+    expect(stderr).toContain('"Authorization":"***')
+    expect(stderr).not.toContain('secret-token')
+    // result line still lands on stdout
+    expect(logSpy.mock.calls[0]![0]).toMatch(/✓ Sent \(status 200\) in \d+ms/)
+  })
+
+  it('send --json failure prints a JSON error object to stderr and exits 1', async () => {
+    fetchMock.mockResolvedValue(new Response('nope', { status: 400 }))
+    const code = await main([
+      'send', '--json',
+      '--preset', 'smtogo',
+      '--url', 'https://x.com',
+      '--to', 'a@b.c', '--subject', 's', '--body', 'b',
+    ])
+    expect(code).toBe(1)
+    // 400 is non-retryable → exactly one attempt
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    // stdout is untouched; the error JSON goes to stderr
+    expect(logSpy).not.toHaveBeenCalled()
+    const errJson = JSON.parse(errSpy.mock.calls[0]![0] as string)
+    expect(errJson).toMatchObject({ ok: false })
+    expect(errJson.error).toMatchObject({ code: 'REQUEST_FAILED', status: 400 })
+    expect(typeof errJson.elapsedMs).toBe('number')
   })
 
   it('send with invalid input exits 1 (validation)', async () => {

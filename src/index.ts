@@ -47,7 +47,7 @@ export {
 } from './input'
 
 // Results & options
-export type { SendOptions, SendResult } from './types'
+export type { SendOptions, SendResult, AttemptInfo } from './types'
 
 // Building blocks
 export { buildPayload } from './payload'

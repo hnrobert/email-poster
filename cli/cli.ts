@@ -11,7 +11,18 @@ import { runExportInterface, runDetectInterface } from './interface-cmd'
 
 const VERSION = '0.3.0'
 
-const BOOL_FLAGS = new Set(['--dry-run', '--json', '--json-schema', '--body-stdin', '--help', '-h', '--version', '-V'])
+const BOOL_FLAGS = new Set([
+  '--dry-run',
+  '--json',
+  '--json-schema',
+  '--body-stdin',
+  '--verbose',
+  '-v',
+  '--help',
+  '-h',
+  '--version',
+  '-V',
+])
 
 interface Parsed {
   flags: Map<string, string[]>
@@ -92,6 +103,8 @@ send OPTIONS
   --timeout-ms <n>       per-request timeout
   --dry-run              print the resolved field map + payload, do not send
   --json                 emit JSON
+  -v, --verbose          verbose debug logging to stderr: resolved config,
+                         payload, redacted headers, and each retry attempt
 
 validate OPTIONS
   --config <path>        config file to validate (required)
@@ -156,6 +169,7 @@ export async function main(argv: string[]): Promise<number> {
       timeoutMs: one(p, '--timeout-ms') ? Number(one(p, '--timeout-ms')) : undefined,
       dryRun: p.bools.has('--dry-run'),
       json: p.bools.has('--json'),
+      verbose: p.bools.has('-v') || p.bools.has('--verbose'),
     }
     return runSend(flags)
   }

@@ -2,6 +2,7 @@ import { composeSignals } from './abort'
 import { computeBackoff, isRetryableFailure } from './retry'
 import { EmailPosterError, ErrorCode } from './errors'
 import type { RetryConfig } from './config'
+import type { AttemptInfo } from './types'
 
 export interface DoPostOptions {
   timeoutMs: number
@@ -9,6 +10,8 @@ export interface DoPostOptions {
   retry: RetryConfig
   successCodes?: number[]
   requestId?: string
+  /** Notified after every attempt (success + each retry). Optional. */
+  onAttempt?: (info: AttemptInfo) => void
 }
 
 export interface DoPostResult {
@@ -126,29 +129,65 @@ export async function doPost(
       opts.requestId ||
       ''
 
+    const willRetry = attempt < maxAttempts
+    let backoffMs: number | undefined
+
     if (res) {
       const status = res.status
       if (isSuccessStatus(status, opts.successCodes)) {
+        opts.onAttempt?.({
+          attempt,
+          maxAttempts,
+          ok: true,
+          retryable: false,
+          status,
+          requestId,
+        })
         return { response: res, status, requestId }
       }
       const retryable = isRetryableFailure({ kind: 'status', status }, opts.retry)
+      const message = `Webhook returned ${status}`
       if (!retryable) {
         const detail = await safeText(res)
-        throw new EmailPosterError(`Webhook returned ${status}${detail ? ': ' + detail : ''}`, {
+        opts.onAttempt?.({
+          attempt,
+          maxAttempts,
+          ok: false,
+          retryable: false,
+          status,
+          errorKind: 'status',
+          message,
+          requestId,
+        })
+        throw new EmailPosterError(`${message}${detail ? ': ' + detail : ''}`, {
           code: ErrorCode.REQUEST_FAILED,
           status,
           detail: detail || undefined,
           requestId,
         })
       }
+      backoffMs = willRetry ? computeBackoff(attempt, opts.retry) : undefined
       lastFailure = {
-        message: `Webhook returned ${status}`,
+        message,
         code: ErrorCode.REQUEST_FAILED,
         status,
         requestId,
       }
+      opts.onAttempt?.({
+        attempt,
+        maxAttempts,
+        ok: false,
+        retryable: willRetry,
+        backoffMs,
+        status,
+        errorKind: 'status',
+        message,
+        requestId,
+      })
     } else {
       const timedOut = controller.signal.aborted
+      const errorKind = timedOut ? 'timeout' : 'network'
+      backoffMs = willRetry ? computeBackoff(attempt, opts.retry) : undefined
       lastFailure = timedOut
         ? {
             message: `Request timed out after ${opts.timeoutMs}ms`,
@@ -162,12 +201,22 @@ export async function doPost(
             cause: fetchError,
             requestId,
           }
+      opts.onAttempt?.({
+        attempt,
+        maxAttempts,
+        ok: false,
+        retryable: willRetry,
+        backoffMs,
+        errorKind,
+        message: lastFailure.message,
+        requestId,
+      })
     }
 
     // Backoff before the next attempt (interruptible by the external signal).
-    if (attempt < maxAttempts) {
+    if (willRetry) {
       try {
-        await sleep(computeBackoff(attempt, opts.retry), opts.signal)
+        await sleep(backoffMs!, opts.signal)
       } catch {
         throw new EmailPosterError('Request aborted by caller', {
           code: ErrorCode.ABORTED,
