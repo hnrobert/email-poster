@@ -1,6 +1,6 @@
 {
   "name": "email-poster",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Schema-driven email sending over HTTP POST webhooks (SMToGo / Resend-like / custom JSON gateways).",
   "keywords": [
     "email",
