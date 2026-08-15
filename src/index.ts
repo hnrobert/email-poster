@@ -58,8 +58,16 @@ export { composeSignals, isAbortError } from './abort'
 export { computeBackoff, isRetryableFailure } from './retry'
 export type { RetryableFailure } from './retry'
 export { checkUrl } from './url-guard'
-export { slidingWindow, tokenBucket } from './rate-limit'
-export type { RateLimiter } from './rate-limit'
+export {
+  slidingWindow,
+  tokenBucket,
+  createEmailLimiter,
+  emailLimitErrorMessage,
+  DEFAULT_EMAIL_DAILY_LIMIT,
+  DEFAULT_ACCOUNT_DAILY_LIMIT,
+  DEFAULT_ACCOUNT_PER_MINUTE,
+} from './rate-limit'
+export type { RateLimiter, EmailLimiter, EmailLimiterOptions, EmailLimitResult } from './rate-limit'
 
 // Hooks
 export {

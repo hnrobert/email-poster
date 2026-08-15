@@ -137,11 +137,35 @@ new EmailPoster({ postUrl, urlGuard: {
 
 ## Rate limiting (opt-in utilities)
 
+Two levels:
+
+**Generic single-bucket limiters** — wire into any send path:
+
 ```ts
 import { slidingWindow, tokenBucket } from 'email-poster'
 const limiter = slidingWindow({ windowMs: 60_000, max: 30 })
-if (limiter.take('a@b.c')) await mail.send(input)
+if (limiter.tryTake()) await send({ to: 'a@b.c', subject: 'Hi', body: 'b' })
 ```
+
+**`createEmailLimiter`** — the transactional-email throttle: sliding-window
+counters in two independent dimensions, per recipient address (keyed by flow,
+default 1/min · 10/day) and per sender account (aggregated across flows,
+default 6/min · 24/day). Results carry `retryInSeconds` and a `warning` once
+the daily count nears the cap:
+
+```ts
+import { createEmailLimiter, emailLimitErrorMessage } from 'email-poster'
+
+const emailLimiter = createEmailLimiter() // caps overridable: { targetPerDay, accountPerMinute, … }
+
+const limit = emailLimiter.checkTarget('code', 'a@b.c') // .checkAccount(userId) for senders
+if (!limit.allowed) throw new HttpError(429, emailLimitErrorMessage(limit))
+if (limit.warning) toast(limit.warning) // "Heads up: this address is limited to 10 emails per day."
+```
+
+In-memory and single-instance (one process = one set of counters); every field
+of the result is data, so you control the error shape — `emailLimitErrorMessage`
+just supplies ready-to-serve wording (429-style).
 
 ## Config sources & singleton
 
@@ -217,7 +241,7 @@ The CTA button (and the `welcome` badge) automatically pick a readable foregroun
 whitelisted through `safeColor` — anything that isn't a plain hex falls back to the default
 yellow, so a hostile color string can never inject CSS.
 
-### Presets
+### Theme Presets
 
 | Name | Renderer | Content model |
 | --- | --- | --- |

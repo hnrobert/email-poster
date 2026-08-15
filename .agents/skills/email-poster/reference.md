@@ -71,6 +71,33 @@ Backoff = full-jitter exponential: `random(0, min(maxDelayMs, baseDelayMs * 2^(a
 
 `EmailPosterError` has `{ code, status?, detail?, requestId?, cause? }`. Guard with `isEmailPosterError(e)`.
 
+## Rate limiting (root export)
+
+Opt-in, framework-free. Two levels:
+
+- **Generic single-bucket limiters** — `slidingWindow({ windowMs, max })` and
+  `tokenBucket({ capacity, refillPerSec })`, both returning
+  `{ check(): void; tryTake(): boolean }`.
+- **`createEmailLimiter(opts?)` → `{ checkTarget(flow, email, now?), checkAccount(userId, now?), reset() }`** —
+  the transactional-email throttle: sliding-window counters per recipient address
+  (keyed by flow; default 1/min · `DEFAULT_EMAIL_DAILY_LIMIT`=10/day, warn when
+  daily count >5) and per sender account (aggregated across flows; default
+  `DEFAULT_ACCOUNT_PER_MINUTE`=6/min · `DEFAULT_ACCOUNT_DAILY_LIMIT`=24/day,
+  warn at ≥20). Every cap is overridable via
+  `{ targetPerMinute, targetPerDay, targetWarnAfter, accountPerMinute, accountPerDay, accountWarnAt }`.
+
+```ts
+import { createEmailLimiter, emailLimitErrorMessage } from 'email-poster'
+
+const emailLimiter = createEmailLimiter()
+const limit = emailLimiter.checkTarget('code', email)
+if (!limit.allowed) throw createError({ statusCode: 429, statusMessage: emailLimitErrorMessage(limit) })
+if (limit.warning) return { ok: true, warning: limit.warning }
+```
+
+`EmailLimitResult` = `{ allowed, reason?: 'minute'|'day', dailyCount, dailyLimit, scope: 'address'|'account', retryInSeconds?, warning? }` —
+pure data, so the HTTP error shape stays yours. In-memory, single-instance.
+
 ## Browser-safe subset: `email-poster/pure`
 
 The entire field-mapping / payload / interface layer with **zero `node:` imports** — no `fetch`,
