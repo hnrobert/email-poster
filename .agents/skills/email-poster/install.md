@@ -31,6 +31,11 @@ npx email-poster validate --config .email-posterrc.json
 
 Config precedence (`send`, `test`): `.email-posterrc.json` < `EMAIL_POSTER_*` env < `--config <file>` < CLI flags.
 
+Staying current: bare `npx email-poster` is pinned to the first version its
+cache resolved (and to the project's installed version, if any) — see
+[`updating.md`](./updating.md) for moving npx / dependency / Docker consumers
+to the newest release.
+
 ## Env-only (no code config)
 
 ```ts

@@ -117,4 +117,4 @@ SFC ships as `.vue` source). See `reference.md` for the full props / emits / slo
 - **messageId is best-effort:** parsed from the downstream JSON (`id`/`messageId`) only when `parseMessageId` is true (default); else synthesized as `<post-<hex>@webhook>`.
 - **Attachments are opaque:** pass `{ filename, content }` where `content` is already base64; the package never reads files at runtime (only the CLI `--attach` base64-encodes).
 
-See `reference.md` (full config/input/error reference), `presets.md` (preset JSON examples), and `install.md` (framework wiring).
+See `reference.md` (full config/input/error reference), `presets.md` (preset JSON examples), `install.md` (framework wiring), and `updating.md` (how to move npx / dependency / Docker consumers to the newest release — including the npx cache gotcha).

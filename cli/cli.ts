@@ -4,13 +4,22 @@
  * @license Apache-2.0
  */
 import { pathToFileURL } from 'node:url'
+import { realpathSync, readFileSync } from 'node:fs'
 import { runSend, parseHeaders, type SendFlags } from './send'
 import { runTest, type TestFlags } from './test'
 import { runValidate } from './validate-cmd'
 import { runInstallSkill } from './install-skill'
 import { runExportInterface, runDetectInterface } from './interface-cmd'
 
-const VERSION = '0.3.0'
+/**
+ * Read from package.json at runtime (one level up: cli/ → repo root, or
+ * dist/ → package root — both are one directory deep) so release CI's version
+ * bump is what `--version` reports — a hardcoded constant here drifted to
+ * 0.3.0 while the package was already at 0.3.8.
+ */
+export const VERSION: string = (JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+) as { version: string }).version
 
 const BOOL_FLAGS = new Set([
   '--dry-run',
@@ -249,9 +258,24 @@ export async function main(argv: string[]): Promise<number> {
   return 1
 }
 
-// Run only when invoked as the entry script (not when imported, e.g. by tests).
-const invokedAs = process.argv[1] ? pathToFileURL(process.argv[1]).href : ''
-if (import.meta.url === invokedAs) {
+/**
+ * True when this module is the process entry script — NOT when imported (e.g.
+ * by tests). Compares against the realpath of argv[1] as well, because npm/npx
+ * invoke bins through a `node_modules/.bin/<name>` symlink while Node reports
+ * `import.meta.url` as the symlink's target; a plain argv[1] comparison made
+ * every npx invocation exit silently without running main().
+ */
+export function isMainEntry(argv1: string | undefined, moduleUrl: string): boolean {
+  if (!argv1) return false
+  if (pathToFileURL(argv1).href === moduleUrl) return true
+  try {
+    return pathToFileURL(realpathSync(argv1)).href === moduleUrl
+  } catch {
+    return false
+  }
+}
+
+if (isMainEntry(process.argv[1], import.meta.url)) {
   main(process.argv.slice(2)).then((code) => {
     process.exitCode = code
   })

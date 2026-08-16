@@ -489,6 +489,11 @@ npx email-poster install-skill all   # install the bundled Agent Skill for every
 Run `npx email-poster --help` for the full flag list.
 Config precedence (`send`, `test`): `.email-posterrc.json` < `EMAIL_POSTER_*` env < `--config <file>` < flags.
 
+> **npx caches.** A bare `npx email-poster` sticks to the first version it ever resolved on
+> your machine (and inside a project it runs that project's installed version). For the
+> newest release use `npx email-poster@latest` — see the
+> [updating guide](./.agents/skills/email-poster/updating.md) for every consumer type.
+
 ## Framework adapters
 
 ```ts
