@@ -108,9 +108,13 @@ export const EmailPosterConfigSchema = z.object({
     .default({}),
   limits: z
     .object({
-      maxLenRecipientEmail: z.number().int().min(1).default(320),
-      maxLenSubject: z.number().int().min(1).default(200),
-      maxLenBody: z.number().int().min(1).default(50_000),
+      /** Max recipient email length in characters. Default: unlimited. */
+      maxLenRecipientEmail: z.number().int().min(1).optional(),
+      /** Max subject length in characters. Default: unlimited. */
+      maxLenSubject: z.number().int().min(1).optional(),
+      /** Max body length in characters. Default: unlimited (HTML email bodies
+       * with inlined images routinely run into hundreds of KB). */
+      maxLenBody: z.number().int().min(1).optional(),
     })
     .default({}),
   /** Instance-only. NOT loaded from env (functions are not serializable). */
@@ -123,6 +127,12 @@ export const EmailPosterConfigSchema = z.object({
     .optional(),
   /** Try to parse id/messageId from the downstream JSON response before synthesizing. */
   parseMessageId: z.boolean().default(true),
+  /**
+   * Print one terminal line per send — success or failure (`console.log` /
+   * `console.error`). Default true so sends are never silent; set `false`
+   * (or `EMAIL_POSTER_LOG=false`) to quiet the library.
+   */
+  log: z.boolean().default(true),
 })
 /** The fully-parsed config (defaults applied) — what `EmailPoster.config` holds. */
 export type EmailPosterConfig = z.infer<typeof EmailPosterConfigSchema>

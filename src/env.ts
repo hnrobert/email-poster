@@ -25,6 +25,10 @@ export function loadEnvConfig(env: NodeJS.ProcessEnv = process.env): Record<stri
     cfg.parseMessageId = parseBool(env.EMAIL_POSTER_PARSE_MESSAGE_ID) ?? true
   }
 
+  if (env.EMAIL_POSTER_LOG !== undefined) {
+    cfg.log = parseBool(env.EMAIL_POSTER_LOG) ?? true
+  }
+
   const retry: Record<string, unknown> = {}
   const codes = parseCsvNumbers(env.EMAIL_POSTER_RETRY_CODES)
   if (codes) retry.codes = codes

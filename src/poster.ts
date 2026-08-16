@@ -17,6 +17,7 @@ import {
   runOnError,
 } from './hooks'
 import { loadEnvConfig } from './env'
+import { formatSendSuccess, formatSendFailure } from './log'
 import type { SendOptions, SendResult } from './types'
 
 interface ZodIssueLike {
@@ -71,6 +72,22 @@ export class EmailPoster {
   }
 
   async send(input: SendMailInput, opts: SendOptions = {}): Promise<SendResult> {
+    // Default terminal logging: one line per send, success or failure. See
+    // src/log.ts; `log: false` (or EMAIL_POSTER_LOG=false) silences it.
+    if (!this.config.log) return this.doSend(input, opts)
+    const t0 = Date.now()
+    try {
+      const result = await this.doSend(input, opts)
+      console.log(formatSendSuccess(input, result, Date.now() - t0))
+      return result
+    } catch (e) {
+      console.error(formatSendFailure(input, e, Date.now() - t0))
+      throw e
+    }
+  }
+
+  /** The actual send pipeline, without the logging wrapper. */
+  private async doSend(input: SendMailInput, opts: SendOptions = {}): Promise<SendResult> {
     const parsed = SendMailInputSchema.safeParse(input)
     if (!parsed.success) {
       throw new EmailPosterError('Invalid email input', {

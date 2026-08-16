@@ -90,13 +90,36 @@ new EmailPoster({
   },
   urlGuard: { httpsOnly: true, blockPrivateNetworks: true, allowHosts: ['*.example.com'] },
   recipients: { serialize: 'comma', maxLength: 50 },   // or 'array'
-  limits: { maxLenRecipientEmail: 320, maxLenSubject: 200, maxLenBody: 50_000 },
+  limits: { maxLenRecipientEmail: 320, maxLenSubject: 200, maxLenBody: 50_000 }, // ALL OPTIONAL — unset = unlimited (the default)
   hooks: { beforeSend, afterSend, onError },
   parseMessageId: true,          // parse id/messageId from response JSON
+  log: true,                     // one terminal line per send (success/failure); false to silence
 })
 ```
 
 > `Content-Type` is **always forced** to `application/json`, even if set in `headers`.
+
+## Size limits & send logging
+
+**Length caps are opt-in.** By default the library applies **no** size limits —
+HTML bodies with inlined base64 images routinely run to hundreds of KB. Set
+`limits` only when your downstream webhook wants them enforced:
+
+```ts
+new EmailPoster({ postUrl, limits: { maxLenSubject: 200, maxLenBody: 50_000 } })
+```
+
+**Every send logs one terminal line by default** (success via stdout, failure
+via stderr; body never printed, subject truncated to 80 chars), so outbound
+mail is never silent:
+
+```text
+[email-poster] sent → to=a@b.c subject="Welcome!" status=202 messageId=abc (143ms)
+[email-poster] send FAILED → to=a@b.c subject="Hi" code=REQUEST_FAILED status=503 (2.1s)
+```
+
+Silence it with `log: false` (or `EMAIL_POSTER_LOG=false`). The CLI passes
+`log: false` itself — it prints its own result lines.
 
 ## Reliability
 

@@ -66,6 +66,9 @@ export async function runSend(flags: SendFlags): Promise<number> {
   if (flags.url) flagCfg.postUrl = flags.url
   if (flags.timeoutMs !== undefined) flagCfg.timeoutMs = flags.timeoutMs
   if (Object.keys(headers).length) flagCfg.headers = headers
+  // The CLI prints its own result lines (✓/error + --json) — silence the
+  // library's default per-send logging so output isn't doubled.
+  flagCfg.log = false
 
   let mail: EmailPoster
   try {

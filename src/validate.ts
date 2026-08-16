@@ -4,7 +4,8 @@ import { EmailPosterError, ErrorCode } from './errors'
 
 /**
  * Semantic validation beyond the Zod shape: recipient format, length caps,
- * and total recipient count. `to` must have at least one address.
+ * and total recipient count. `to` must have at least one address. Length
+ * caps are opt-in — unset limits (`undefined`, the default) are unlimited.
  */
 export function validateInput(input: SendMailInput, config: EmailPosterConfig): void {
   const errors: string[] = []
@@ -20,15 +21,18 @@ export function validateInput(input: SendMailInput, config: EmailPosterConfig): 
   }
   for (const addr of all) {
     if (!EMAIL_RE.test(addr)) errors.push(`invalid recipient email: ${addr}`)
-    if (addr.length > config.limits.maxLenRecipientEmail) {
-      errors.push(`recipient email too long (${addr.length})`)
+    const maxAddr = config.limits.maxLenRecipientEmail
+    if (maxAddr !== undefined && addr.length > maxAddr) {
+      errors.push(`recipient email too long (${addr.length} > ${maxAddr})`)
     }
   }
-  if (input.subject.length > config.limits.maxLenSubject) {
-    errors.push(`subject too long (${input.subject.length} > ${config.limits.maxLenSubject})`)
+  const maxSubject = config.limits.maxLenSubject
+  if (maxSubject !== undefined && input.subject.length > maxSubject) {
+    errors.push(`subject too long (${input.subject.length} > ${maxSubject})`)
   }
-  if (input.body.length > config.limits.maxLenBody) {
-    errors.push(`body too long (${input.body.length} > ${config.limits.maxLenBody})`)
+  const maxBody = config.limits.maxLenBody
+  if (maxBody !== undefined && input.body.length > maxBody) {
+    errors.push(`body too long (${input.body.length} > ${maxBody})`)
   }
 
   if (errors.length > 0) {

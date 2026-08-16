@@ -15,9 +15,10 @@
 | `retry` | `RetryConfig` | see below | Exponential backoff retry. |
 | `urlGuard` | `UrlGuardConfig` | — | Opt-in SSRF guard (off by default). |
 | `recipients` | `{ serialize: 'comma'\|'array', maxLength }` | `{ comma, 50 }` | Multi-recipient serialization + cap. |
-| `limits` | `{ maxLenRecipientEmail, maxLenSubject, maxLenBody }` | `{ 320, 200, 50000 }` | Input length caps. |
+| `limits` | `{ maxLenRecipientEmail?, maxLenSubject?, maxLenBody? }` | all unset | Opt-in input length caps; **unset = unlimited** (default). HTML emails with inlined images run to hundreds of KB. |
 | `hooks` | `{ beforeSend?, afterSend?, onError? }` | — | Instance-only (never loaded from env). |
 | `parseMessageId` | `boolean` | `true` | Parse `id`/`messageId` from response JSON. |
+| `log` | `boolean` | `true` | One terminal line per send (`[email-poster] sent → …` / `send FAILED → …`; body never printed). `false` or `EMAIL_POSTER_LOG=false` silences. The CLI sets it false itself. |
 
 ### `RetryConfig` (default)
 
