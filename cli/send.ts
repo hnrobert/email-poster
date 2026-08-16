@@ -31,6 +31,31 @@ export interface SendFlags {
   verbose: boolean
 }
 
+/** Connection flags shared by every sending command (`send`, `test`). */
+export interface CommonMailFlags {
+  preset?: string
+  config?: string
+  url?: string
+  timeoutMs?: number
+  headers: Record<string, string>
+}
+
+/**
+ * Build the sending EmailPoster from the shared flag set. Config layer:
+ * rc < env < --config file < flags. `log: false` is forced — the CLI prints
+ * its own result lines, so the library's default per-send logging is silenced.
+ */
+export async function buildPoster(flags: CommonMailFlags): Promise<EmailPoster> {
+  const base = await loadBaseConfig({ configPath: flags.config })
+  const flagCfg: Record<string, unknown> = {}
+  if (flags.preset) flagCfg.preset = flags.preset
+  if (flags.url) flagCfg.postUrl = flags.url
+  if (flags.timeoutMs !== undefined) flagCfg.timeoutMs = flags.timeoutMs
+  if (Object.keys(flags.headers).length) flagCfg.headers = flags.headers
+  flagCfg.log = false
+  return new EmailPoster(deepMerge(base, flagCfg))
+}
+
 /** `email-poster send` — build input + config, then send (or print payload). Exit code. */
 export async function runSend(flags: SendFlags): Promise<number> {
   if (flags.to.length === 0) return fail('--to is required')
@@ -59,20 +84,11 @@ export async function runSend(flags: SendFlags): Promise<number> {
   if (flags.tag) input.tagName = flags.tag
   if (attachments.length) input.attachments = attachments
 
-  // Config layer: rc < env < --config file < flags.
-  const base = await loadBaseConfig({ configPath: flags.config })
-  const flagCfg: Record<string, unknown> = {}
-  if (flags.preset) flagCfg.preset = flags.preset
-  if (flags.url) flagCfg.postUrl = flags.url
-  if (flags.timeoutMs !== undefined) flagCfg.timeoutMs = flags.timeoutMs
-  if (Object.keys(headers).length) flagCfg.headers = headers
-  // The CLI prints its own result lines (✓/error + --json) — silence the
-  // library's default per-send logging so output isn't doubled.
-  flagCfg.log = false
-
+  // Config layer: rc < env < --config file < flags (buildPoster forces log:false —
+  // the CLI prints its own result lines).
   let mail: EmailPoster
   try {
-    mail = new EmailPoster(deepMerge(base, flagCfg))
+    mail = await buildPoster({ preset: flags.preset, config: flags.config, url: flags.url, timeoutMs: flags.timeoutMs, headers })
   } catch (e) {
     return fail(isEmailPosterError(e) ? `${e.message} (${e.detail ?? e.code})` : String(e))
   }

@@ -476,13 +476,18 @@ npx email-poster send --dry-run --json --preset custom_example --url https://x.c
 echo "Hello" | npx email-poster send --preset smtogo --url https://x.com \
   --to a@b.c --subject Hi --body-stdin
 
+# Quick connectivity check: send the built-in themed test email (monochrome,
+# light + dark) — or --dry-run to print its HTML without any webhook wired up:
+npx email-poster test --to a@b.c --preset custom_example --url https://x.com
+npx email-poster test --dry-run --to a@b.c
+
 npx email-poster validate --config .email-posterrc.json
 
 npx email-poster install-skill all   # install the bundled Agent Skill for every agent
 ```
 
 Run `npx email-poster --help` for the full flag list.
-Config precedence: `.email-posterrc.json` < `EMAIL_POSTER_*` env < `--config <file>` < flags.
+Config precedence (`send`, `test`): `.email-posterrc.json` < `EMAIL_POSTER_*` env < `--config <file>` < flags.
 
 ## Framework adapters
 

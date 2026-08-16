@@ -4,7 +4,8 @@
  * @license Apache-2.0
  */
 import { pathToFileURL } from 'node:url'
-import { runSend, type SendFlags } from './send'
+import { runSend, parseHeaders, type SendFlags } from './send'
+import { runTest, type TestFlags } from './test'
 import { runValidate } from './validate-cmd'
 import { runInstallSkill } from './install-skill'
 import { runExportInterface, runDetectInterface } from './interface-cmd'
@@ -78,6 +79,7 @@ USAGE
 
 COMMANDS
   send               Validate + assemble + POST an email (or --dry-run to preview)
+  test               Send the built-in themed test email to one recipient
   validate           Zod-check a config file (exit 0 = valid, 1 = invalid)
   export-interface   Print the interface (field map) of a config as JSON
   detect-interface   Infer an interface from a sample downstream JSON
@@ -106,6 +108,17 @@ send OPTIONS
   -v, --verbose          verbose debug logging to stderr: resolved config,
                          payload, redacted headers, and each retry attempt
 
+test OPTIONS
+  --to <addr>            recipient of the test email (required)
+  --preset <name>        smtogo | generic | custom_example
+  --config <path>        config file (.json/.js/.mjs/.cjs)
+  --url <url>            override postUrl
+  --timeout-ms <n>       per-request timeout
+  --header "K: V"        HTTP/auth header (repeatable)
+  --dry-run              print the rendered test email HTML, do not send
+  --json                 emit JSON
+  -v, --verbose          verbose debug logging to stderr
+
 validate OPTIONS
   --config <path>        config file to validate (required)
   --json                 emit JSON
@@ -123,7 +136,7 @@ install-skill OPTIONS
   [agent]                claude | codex | gemini | cursor | opencode | all
                          (omit to auto-detect installed agents; fallback: claude)
 
-CONFIG PRECEDENCE (send)
+CONFIG PRECEDENCE (send, test)
   .email-posterrc.json  <  EMAIL_POSTER_* env  <  --config <file>  <  CLI flags
 
 EXAMPLES
@@ -131,8 +144,8 @@ EXAMPLES
     --to a@b.c --subject Hi --body "Hello" --header "Authorization: Bearer tok"
   echo "Hello" | email-poster send --preset smtogo --url https://x.com \\
     --to a@b.c --subject Hi --body-stdin
-  email-poster send --dry-run --json --config .email-posterrc.json \\
-    --to a@b.c --subject Hi --body b
+  email-poster test --to a@b.c --url https://x.com --preset smtogo
+  email-poster test --dry-run --to a@b.c --config .email-posterrc.json
 `)
 }
 
@@ -172,6 +185,33 @@ export async function main(argv: string[]): Promise<number> {
       verbose: p.bools.has('-v') || p.bools.has('--verbose'),
     }
     return runSend(flags)
+  }
+
+  if (command === 'test') {
+    const to = one(p, '--to')
+    if (!to) {
+      console.error('error: test requires --to <addr>')
+      return 1
+    }
+    let headers: Record<string, string>
+    try {
+      headers = parseHeaders(many(p, '--header'))
+    } catch (e) {
+      console.error(`error: ${e instanceof Error ? e.message : String(e)}`)
+      return 1
+    }
+    const flags: TestFlags = {
+      to,
+      preset: one(p, '--preset'),
+      config: one(p, '--config'),
+      url: one(p, '--url'),
+      timeoutMs: one(p, '--timeout-ms') ? Number(one(p, '--timeout-ms')) : undefined,
+      headers,
+      dryRun: p.bools.has('--dry-run'),
+      json: p.bools.has('--json'),
+      verbose: p.bools.has('-v') || p.bools.has('--verbose'),
+    }
+    return runTest(flags)
   }
 
   if (command === 'validate') {

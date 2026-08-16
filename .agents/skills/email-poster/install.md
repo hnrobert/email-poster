@@ -20,11 +20,16 @@ npx email-poster send --dry-run --preset custom_example --url https://x.com \
 echo "Hello" | npx email-poster send --preset smtogo --url https://x.com \
   --to a@b.c --subject Hi --body-stdin
 
+# Quick test: one command sends the built-in themed test email (monochrome
+# card, light + dark); --dry-run prints its HTML with no webhook needed:
+npx email-poster test --to a@b.c --preset custom_example --url https://x.com
+npx email-poster test --dry-run --to a@b.c
+
 # Validate a config file (exit 0 = valid):
 npx email-poster validate --config .email-posterrc.json
 ```
 
-Config precedence (`send`): `.email-posterrc.json` < `EMAIL_POSTER_*` env < `--config <file>` < CLI flags.
+Config precedence (`send`, `test`): `.email-posterrc.json` < `EMAIL_POSTER_*` env < `--config <file>` < CLI flags.
 
 ## Env-only (no code config)
 
